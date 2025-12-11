@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String   @map("password_hash")
+  fullName            String   @map("full_name")
+  phone               String
+  organization        String?
+  emailVerified       Boolean  @default(false) @map("email_verified")
+  verificationToken   String?  @map("verification_token")
+  resetToken          String?  @map("reset_token")
+  resetTokenExpiry    DateTime? @map("reset_token_expiry")
+  failedLoginAttempts Int      @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLoginAt         DateTime? @map("last_login_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  sportsgrounds  Sportsground[]
+  configurations FieldConfiguration[]
+  bookings       Booking[]
+
+  @@map("users")
+}
+
+model Sportsground {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  defaultZoom Int      @default(18) @map("default_zoom")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  configurations FieldConfiguration[]
+
+  @@map("sportsgrounds")
+}
+
+model FieldTemplate {
+  id              String   @id @default(uuid())
+  sport           String
+  name            String
+  description     String?
+  minLength       Float    @map("min_length")
+  maxLength       Float    @map("max_length")
+  minWidth        Float    @map("min_width")
+  maxWidth        Float    @map("max_width")
+  defaultLength   Float    @map("default_length")
+  defaultWidth    Float    @map("default_width")
+  interiorElements Json    @map("interior_elements")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  configurations FieldConfiguration[]
+
+  @@map("field_templates")
+}
+
+model FieldConfiguration {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  sportsgroundId  String   @map("sportsground_id")
+  templateId      String   @map("template_id")
+  name            String
+  latitude        Float
+  longitude       Float
+  rotationDegrees Float    @map("rotation_degrees")
+  lengthMeters    Float    @map("length_meters")
+  widthMeters     Float    @map("width_meters")
+  lineColor       String   @map("line_color")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sportsground Sportsground  @relation(fields: [sportsgroundId], references: [id], onDelete: Cascade)
+  template     FieldTemplate @relation(fields: [templateId], references: [id])
+  bookings     Booking[]
+
+  @@map("field_configurations")
+}
+
+model Booking {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  configurationId    String   @map("configuration_id")
+  referenceNumber    String   @unique @map("reference_number")
+  preferredDate      DateTime @map("preferred_date")
+  preferredTime      String   @map("preferred_time")
+  alternativeDate    DateTime? @map("alternative_date")
+  notes              String?
+  contactPreference  String   @map("contact_preference")
+  status             String   @default("pending") // pending, confirmed, completed, cancelled
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  configuration FieldConfiguration @relation(fields: [configurationId], references: [id])
+
+  @@map("bookings")
+}
