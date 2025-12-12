@@ -632,12 +632,18 @@ export default function EditorPage() {
     const halfW = fieldWidth / 2
     const colorHexForDrag = colorHex
 
+    // Standard resize icon path (two arrows pointing outward with a line)
+    // Horizontal resize icon ↔
+    const resizeIconH = 'M -8,0 L -4,0 L -4,-3 L -8,0 L -4,3 L -4,0 M 8,0 L 4,0 L 4,-3 L 8,0 L 4,3 L 4,0 M -4,0 L 4,0'
+    // Vertical resize icon (same but rotated via the rotation property)
+
     // Positions: top, bottom, left, right (in local coords)
+    // dir: which direction this edge faces (1 = positive, -1 = negative)
     const edgePositions = [
-      { x: 0, y: halfL, type: 'length' as const, dir: 1 },
-      { x: 0, y: -halfL, type: 'length' as const, dir: -1 },
-      { x: -halfW, y: 0, type: 'width' as const, dir: -1 },
-      { x: halfW, y: 0, type: 'width' as const, dir: 1 },
+      { x: 0, y: halfL, type: 'length' as const, dir: 1, iconRotation: 90 },      // top
+      { x: 0, y: -halfL, type: 'length' as const, dir: -1, iconRotation: 90 },    // bottom
+      { x: -halfW, y: 0, type: 'width' as const, dir: -1, iconRotation: 0 },      // left
+      { x: halfW, y: 0, type: 'width' as const, dir: 1, iconRotation: 0 },        // right
     ]
 
     // Only recreate edge markers if they don't exist or count changed
@@ -647,19 +653,19 @@ export default function EditorPage() {
 
       edgePositions.forEach((edge, idx) => {
         const pos = toLatLng(fieldCenter, edge.x, edge.y)
-        // Simple square resize handle
         const marker = new google.maps.Marker({
           position: pos,
           map: mapRef.current,
           draggable: true,
           icon: {
-            path: 'M -5,-5 L 5,-5 L 5,5 L -5,5 Z',
-            fillColor: '#ffffff',
+            path: resizeIconH,
+            fillColor: '#3b82f6',
             fillOpacity: 1,
-            strokeColor: '#3b82f6',
+            strokeColor: '#ffffff',
             strokeWeight: 2,
             scale: 1,
             anchor: new google.maps.Point(0, 0),
+            rotation: edge.iconRotation + rotation,
           },
           title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
         })
@@ -670,12 +676,14 @@ export default function EditorPage() {
 
         marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
           if (e.latLng && fieldCenterRef.current) {
+            const center = fieldCenterRef.current
             const metersPerDegreeLat = 111320
-            const metersPerDegreeLng = 111320 * Math.cos((fieldCenterRef.current.lat * Math.PI) / 180)
+            const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
             const rotationRad = (rotationRef.current * Math.PI) / 180
 
-            const dLat = e.latLng.lat() - fieldCenterRef.current.lat
-            const dLng = e.latLng.lng() - fieldCenterRef.current.lng
+            // Get drag position in local coordinates
+            const dLat = e.latLng.lat() - center.lat
+            const dLng = e.latLng.lng() - center.lng
 
             const unrotatedLat = dLat * Math.cos(-rotationRad) - dLng * Math.sin(-rotationRad)
             const unrotatedLng = dLat * Math.sin(-rotationRad) + dLng * Math.cos(-rotationRad)
@@ -685,26 +693,80 @@ export default function EditorPage() {
 
             let newLength = fieldLengthRef.current
             let newWidth = fieldWidthRef.current
+            let newCenter = { ...center }
             const template = selectedTemplateRef.current
 
             if (edge.type === 'length') {
-              const newHalfLength = Math.abs(localY)
-              newLength = Math.round(newHalfLength * 2)
+              // Get the position of the opposite edge (fixed)
+              const oppositeY = -edge.dir * (fieldLengthRef.current / 2)
+              // New edge position is where the user dragged
+              const newEdgeY = localY
+              // New length is distance between edges
+              const rawLength = Math.abs(newEdgeY - oppositeY)
+              newLength = Math.round(rawLength)
+
+              // Apply constraints
               if (template) {
                 newLength = Math.min(Math.max(newLength, template.minLength), template.maxLength)
               }
+
+              // Calculate new center (midpoint between fixed edge and new edge)
+              const constrainedEdgeY = oppositeY + edge.dir * newLength
+              const newCenterY = (oppositeY + constrainedEdgeY) / 2
+
+              // Convert new center back to lat/lng
+              const newCenterLatOffset = (newCenterY / metersPerDegreeLat) * Math.cos(rotationRad)
+              const newCenterLngOffset = (newCenterY / metersPerDegreeLat) * Math.sin(rotationRad)
+              newCenter = {
+                lat: center.lat + newCenterLatOffset - (unrotatedLat - newCenterY / metersPerDegreeLat * metersPerDegreeLat) * 0,
+                lng: center.lng + newCenterLngOffset
+              }
+              // Simpler: just shift center by half the difference
+              const centerShift = (newLength - fieldLengthRef.current) / 2 * edge.dir
+              const shiftLat = (centerShift / metersPerDegreeLat) * Math.cos(rotationRad)
+              const shiftLng = (centerShift / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
+              newCenter = {
+                lat: center.lat + shiftLat,
+                lng: center.lng + shiftLng
+              }
+
               fieldLengthRef.current = newLength
+              fieldCenterRef.current = newCenter
             } else {
-              const newHalfWidth = Math.abs(localX)
-              newWidth = Math.round(newHalfWidth * 2)
+              // Width (left/right edges)
+              const oppositeX = -edge.dir * (fieldWidthRef.current / 2)
+              const newEdgeX = localX
+              const rawWidth = Math.abs(newEdgeX - oppositeX)
+              newWidth = Math.round(rawWidth)
+
               if (template) {
                 newWidth = Math.min(Math.max(newWidth, template.minWidth), template.maxWidth)
               }
+
+              // Shift center
+              const centerShift = (newWidth - fieldWidthRef.current) / 2 * edge.dir
+              const shiftLat = -(centerShift / metersPerDegreeLng) * Math.sin(rotationRad) * (metersPerDegreeLng / metersPerDegreeLat)
+              const shiftLng = (centerShift / metersPerDegreeLng) * Math.cos(rotationRad)
+              newCenter = {
+                lat: center.lat + shiftLat,
+                lng: center.lng + shiftLng
+              }
+
               fieldWidthRef.current = newWidth
+              fieldCenterRef.current = newCenter
             }
 
-            // Redraw field lines only
-            redrawFieldLines(fieldCenterRef.current, newLength, newWidth, rotationRef.current, colorHexForDrag)
+            // Redraw field lines with new center
+            redrawFieldLines(newCenter, newLength, newWidth, rotationRef.current, colorHexForDrag)
+
+            // Update the marker position to stay on the edge
+            const newHalfL = newLength / 2
+            const newHalfW = newWidth / 2
+            const edgePos = edge.type === 'length'
+              ? { x: 0, y: edge.dir * newHalfL }
+              : { x: edge.dir * newHalfW, y: 0 }
+            const markerPos = toLatLng(newCenter, edgePos.x, edgePos.y, rotationRef.current)
+            marker.setPosition(markerPos)
           }
         })
 
@@ -713,24 +775,39 @@ export default function EditorPage() {
           // Commit the final values to state
           setFieldLength(fieldLengthRef.current)
           setFieldWidth(fieldWidthRef.current)
+          if (fieldCenterRef.current) {
+            setFieldCenter(fieldCenterRef.current)
+          }
         })
 
         edgeMarkersRef.current.push(marker)
       })
     } else {
-      // Update existing marker positions
+      // Update existing marker positions and icon rotation
       edgePositions.forEach((edge, idx) => {
         const pos = toLatLng(fieldCenter, edge.x, edge.y)
         edgeMarkersRef.current[idx].setPosition(pos)
+        edgeMarkersRef.current[idx].setIcon({
+          path: resizeIconH,
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 1,
+          anchor: new google.maps.Point(0, 0),
+          rotation: edge.iconRotation + rotation,
+        })
       })
     }
 
-    // Corner markers for rotation
+    // Corner markers for rotation - standard rotate icon (circular arrow)
+    const rotateIcon = 'M 0,-8 A 8,8 0 1,1 -8,0 M -8,0 L -5,-3 M -8,0 L -5,3'
+
     const cornerPositions = [
-      { x: -halfW, y: halfL },
-      { x: halfW, y: halfL },
-      { x: halfW, y: -halfL },
-      { x: -halfW, y: -halfL },
+      { x: -halfW, y: halfL, iconRot: 0 },     // top-left
+      { x: halfW, y: halfL, iconRot: 90 },     // top-right
+      { x: halfW, y: -halfL, iconRot: 180 },   // bottom-right
+      { x: -halfW, y: -halfL, iconRot: 270 },  // bottom-left
     ]
 
     // Only recreate corner markers if they don't exist
@@ -740,27 +817,24 @@ export default function EditorPage() {
 
       cornerPositions.forEach((corner, idx) => {
         const pos = toLatLng(fieldCenter, corner.x, corner.y)
-        // Circular rotation arrow icon
         const marker = new google.maps.Marker({
           position: pos,
           map: mapRef.current,
           draggable: true,
           icon: {
-            // Circular arrow (rotate icon) - simplified curved arrow
-            path: 'M 0,-7 A 7,7 0 1,1 -7,0 L -7,-3 L -10,0 L -7,3 L -7,0 A 7,7 0 0,0 0,-7 Z',
-            fillColor: '#22c55e',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 1.5,
+            path: rotateIcon,
+            fillColor: '#f59e0b',
+            fillOpacity: 0,
+            strokeColor: '#f59e0b',
+            strokeWeight: 2.5,
             scale: 1.2,
             anchor: new google.maps.Point(0, 0),
-            rotation: idx * 90, // Rotate each corner's icon differently
+            rotation: corner.iconRot + rotation,
           },
           title: 'Drag to rotate',
         })
 
         // Calculate initial angle for this corner based on index
-        // Corners are: TL, TR, BR, BL
         const getCornerAngle = (index: number, length: number, width: number) => {
           const hL = length / 2
           const hW = width / 2
@@ -794,8 +868,20 @@ export default function EditorPage() {
 
             rotationRef.current = Math.round(newRotation)
 
-            // Redraw field lines only
+            // Redraw field lines
             redrawFieldLines(fieldCenterRef.current, fieldLengthRef.current, fieldWidthRef.current, rotationRef.current, colorHexForDrag)
+
+            // Update marker position to stay at corner
+            const hL = fieldLengthRef.current / 2
+            const hW = fieldWidthRef.current / 2
+            const cornerCoords = [
+              { x: -hW, y: hL },
+              { x: hW, y: hL },
+              { x: hW, y: -hL },
+              { x: -hW, y: -hL },
+            ]
+            const cornerPos = toLatLng(fieldCenterRef.current, cornerCoords[idx].x, cornerCoords[idx].y, rotationRef.current)
+            marker.setPosition(cornerPos)
           }
         })
 
@@ -807,10 +893,20 @@ export default function EditorPage() {
         cornerMarkersRef.current.push(marker)
       })
     } else {
-      // Update existing marker positions
+      // Update existing marker positions and icon rotation
       cornerPositions.forEach((corner, idx) => {
         const pos = toLatLng(fieldCenter, corner.x, corner.y)
         cornerMarkersRef.current[idx].setPosition(pos)
+        cornerMarkersRef.current[idx].setIcon({
+          path: rotateIcon,
+          fillColor: '#f59e0b',
+          fillOpacity: 0,
+          strokeColor: '#f59e0b',
+          strokeWeight: 2.5,
+          scale: 1.2,
+          anchor: new google.maps.Point(0, 0),
+          rotation: corner.iconRot + rotation,
+        })
       })
     }
   }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate, redrawFieldLines])
@@ -981,12 +1077,14 @@ export default function EditorPage() {
                     <span>Drag center to move</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 bg-white border-2 border-blue-500"></span>
+                    <svg className="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 12H4m0 0l2-2m-2 2l2 2m12-2h-4m4 0l-2-2m2 2l-2 2"/>
+                    </svg>
                     <span>Drag edges to resize</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    <svg className="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 12a8 8 0 0 1 8-8m0 0V1m0 3l-2-2m2 2l2-2"/>
                     </svg>
                     <span>Drag corners to rotate</span>
                   </div>
