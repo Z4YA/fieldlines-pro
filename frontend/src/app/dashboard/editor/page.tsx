@@ -153,6 +153,18 @@ export default function EditorPage() {
   useEffect(() => {
     if (!mapContainerRef.current || isLoading) return
 
+    // Ensure container has dimensions
+    const container = mapContainerRef.current
+    if (container.clientWidth === 0 || container.clientHeight === 0) {
+      // Retry after a short delay if container not ready
+      const timer = setTimeout(() => {
+        if (mapContainerRef.current && !mapRef.current) {
+          mapContainerRef.current.dispatchEvent(new Event('resize'))
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+
     const center: [number, number] = sportsground
       ? [sportsground.longitude, sportsground.latitude]
       : [151.2093, -33.8688] // Sydney default
@@ -165,6 +177,10 @@ export default function EditorPage() {
       center,
       zoom,
       attributionControl: false,
+    })
+
+    map.on('load', () => {
+      map.resize()
     })
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
@@ -647,7 +663,7 @@ export default function EditorPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Top toolbar */}
       <div className="bg-white border-b px-4 py-2 flex items-center justify-between z-20">
         <div className="flex items-center space-x-4">
@@ -845,8 +861,8 @@ export default function EditorPage() {
         </div>
 
         {/* Map and canvas area */}
-        <div className="flex-1 relative">
-          <div ref={mapContainerRef} className="absolute inset-0" />
+        <div className="flex-1 relative min-h-0">
+          <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
           <canvas
             ref={canvasRef}
             className="absolute inset-0 pointer-events-auto"
