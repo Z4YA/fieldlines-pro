@@ -70,7 +70,8 @@ export default function EditorPage() {
 
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
-  const fieldOverlayRef = useRef<google.maps.Polygon | null>(null)
+  const fieldOverlaysRef = useRef<google.maps.Polyline[]>([])
+  const dragMarkerRef = useRef<google.maps.Marker | null>(null)
 
   const [sportsground, setSportsground] = useState<Sportsground | null>(null)
   const [templates, setTemplates] = useState<FieldTemplate[]>([])
@@ -184,47 +185,200 @@ export default function EditorPage() {
       .catch(console.error)
 
     return () => {
-      if (fieldOverlayRef.current) {
-        fieldOverlayRef.current.setMap(null)
+      fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
+      fieldOverlaysRef.current = []
+      if (dragMarkerRef.current) {
+        dragMarkerRef.current.setMap(null)
       }
       mapRef.current = null
     }
   }, [GOOGLE_API_KEY, isLoading, sportsground])
 
-  // Calculate field polygon coordinates
-  const calculateFieldCoords = useCallback(
-    (center: { lat: number; lng: number }) => {
-      // Convert meters to degrees (approximate)
+  // Helper to convert local coordinates to lat/lng with rotation
+  const toLatLng = useCallback(
+    (center: { lat: number; lng: number }, x: number, y: number) => {
+      // x is along the width (goal line direction), y is along the length (touchline direction)
       const metersPerDegreeLat = 111320
       const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
 
-      const halfLength = fieldLength / 2 / metersPerDegreeLat
-      const halfWidth = fieldWidth / 2 / metersPerDegreeLng
+      const rotationRad = (rotation * Math.PI) / 180
 
-      // Corners before rotation (length along lat, width along lng)
-      const corners = [
-        { lat: -halfLength, lng: -halfWidth },
-        { lat: -halfLength, lng: halfWidth },
-        { lat: halfLength, lng: halfWidth },
-        { lat: halfLength, lng: -halfWidth },
-      ]
+      // Convert meters to degrees
+      const dLat = y / metersPerDegreeLat
+      const dLng = x / metersPerDegreeLng
 
       // Apply rotation
-      const rotationRad = (rotation * Math.PI) / 180
-      const rotatedCorners = corners.map((corner) => {
-        const rotatedLat =
-          corner.lat * Math.cos(rotationRad) - corner.lng * Math.sin(rotationRad)
-        const rotatedLng =
-          corner.lat * Math.sin(rotationRad) + corner.lng * Math.cos(rotationRad)
-        return {
-          lat: center.lat + rotatedLat,
-          lng: center.lng + rotatedLng,
-        }
-      })
+      const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
+      const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
 
-      return rotatedCorners
+      return {
+        lat: center.lat + rotatedLat,
+        lng: center.lng + rotatedLng,
+      }
     },
-    [fieldLength, fieldWidth, rotation]
+    [rotation]
+  )
+
+  // Generate soccer field lines
+  const generateSoccerFieldLines = useCallback(
+    (center: { lat: number; lng: number }) => {
+      const L = fieldLength // Total length (touchline)
+      const W = fieldWidth  // Total width (goal line)
+
+      // Standard soccer field dimensions (scaled to actual field size)
+      // All measurements from center of field
+      const halfL = L / 2
+      const halfW = W / 2
+
+      // Penalty area: 16.5m from goal line, 40.3m wide (20.15m each side of goal)
+      const penaltyDepth = 16.5
+      const penaltyWidth = 40.3 / 2
+
+      // Goal area: 5.5m from goal line, 18.3m wide (9.15m each side of goal)
+      const goalAreaDepth = 5.5
+      const goalAreaWidth = 18.3 / 2
+
+      // Center circle radius: 9.15m
+      const centerCircleRadius = 9.15
+
+      // Penalty spot: 11m from goal line
+      const penaltySpotDist = 11
+
+      // Penalty arc radius: 9.15m from penalty spot
+      const penaltyArcRadius = 9.15
+
+      // Corner arc radius: 1m
+      const cornerArcRadius = 1
+
+      const lines: { lat: number; lng: number }[][] = []
+
+      // 1. Outer boundary (rectangle)
+      lines.push([
+        toLatLng(center, -halfW, -halfL),
+        toLatLng(center, halfW, -halfL),
+        toLatLng(center, halfW, halfL),
+        toLatLng(center, -halfW, halfL),
+        toLatLng(center, -halfW, -halfL),
+      ])
+
+      // 2. Center line
+      lines.push([
+        toLatLng(center, -halfW, 0),
+        toLatLng(center, halfW, 0),
+      ])
+
+      // 3. Center circle (approximated with points)
+      const centerCircle: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 36; i++) {
+        const angle = (i / 36) * 2 * Math.PI
+        centerCircle.push(
+          toLatLng(center, centerCircleRadius * Math.cos(angle), centerCircleRadius * Math.sin(angle))
+        )
+      }
+      lines.push(centerCircle)
+
+      // 4. Top penalty area (y = halfL side)
+      lines.push([
+        toLatLng(center, -penaltyWidth, halfL),
+        toLatLng(center, -penaltyWidth, halfL - penaltyDepth),
+        toLatLng(center, penaltyWidth, halfL - penaltyDepth),
+        toLatLng(center, penaltyWidth, halfL),
+      ])
+
+      // 5. Bottom penalty area (y = -halfL side)
+      lines.push([
+        toLatLng(center, -penaltyWidth, -halfL),
+        toLatLng(center, -penaltyWidth, -halfL + penaltyDepth),
+        toLatLng(center, penaltyWidth, -halfL + penaltyDepth),
+        toLatLng(center, penaltyWidth, -halfL),
+      ])
+
+      // 6. Top goal area
+      lines.push([
+        toLatLng(center, -goalAreaWidth, halfL),
+        toLatLng(center, -goalAreaWidth, halfL - goalAreaDepth),
+        toLatLng(center, goalAreaWidth, halfL - goalAreaDepth),
+        toLatLng(center, goalAreaWidth, halfL),
+      ])
+
+      // 7. Bottom goal area
+      lines.push([
+        toLatLng(center, -goalAreaWidth, -halfL),
+        toLatLng(center, -goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLng(center, goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLng(center, goalAreaWidth, -halfL),
+      ])
+
+      // 8. Top penalty arc (arc outside penalty area)
+      const topPenaltyArc: { lat: number; lng: number }[] = []
+      const topPenaltySpotY = halfL - penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) - Math.PI / 2 // Arc facing down
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = topPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py < halfL - penaltyDepth) {
+          topPenaltyArc.push(toLatLng(center, px, py))
+        }
+      }
+      if (topPenaltyArc.length > 1) lines.push(topPenaltyArc)
+
+      // 9. Bottom penalty arc
+      const bottomPenaltyArc: { lat: number; lng: number }[] = []
+      const bottomPenaltySpotY = -halfL + penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) + Math.PI / 2 // Arc facing up
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = bottomPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py > -halfL + penaltyDepth) {
+          bottomPenaltyArc.push(toLatLng(center, px, py))
+        }
+      }
+      if (bottomPenaltyArc.length > 1) lines.push(bottomPenaltyArc)
+
+      // 10. Corner arcs
+      // Top-left corner
+      const topLeftCorner: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 9; i++) {
+        const angle = (i / 9) * (Math.PI / 2)
+        topLeftCorner.push(
+          toLatLng(center, -halfW + cornerArcRadius * Math.sin(angle), halfL - cornerArcRadius * Math.cos(angle))
+        )
+      }
+      lines.push(topLeftCorner)
+
+      // Top-right corner
+      const topRightCorner: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 9; i++) {
+        const angle = (i / 9) * (Math.PI / 2)
+        topRightCorner.push(
+          toLatLng(center, halfW - cornerArcRadius * Math.sin(angle), halfL - cornerArcRadius * Math.cos(angle))
+        )
+      }
+      lines.push(topRightCorner)
+
+      // Bottom-left corner
+      const bottomLeftCorner: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 9; i++) {
+        const angle = (i / 9) * (Math.PI / 2)
+        bottomLeftCorner.push(
+          toLatLng(center, -halfW + cornerArcRadius * Math.sin(angle), -halfL + cornerArcRadius * Math.cos(angle))
+        )
+      }
+      lines.push(bottomLeftCorner)
+
+      // Bottom-right corner
+      const bottomRightCorner: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 9; i++) {
+        const angle = (i / 9) * (Math.PI / 2)
+        bottomRightCorner.push(
+          toLatLng(center, halfW - cornerArcRadius * Math.sin(angle), -halfL + cornerArcRadius * Math.cos(angle))
+        )
+      }
+      lines.push(bottomRightCorner)
+
+      return lines
+    },
+    [fieldLength, fieldWidth, toLatLng]
   )
 
   // Draw/update field overlay
@@ -232,47 +386,54 @@ export default function EditorPage() {
     if (!mapRef.current || !isMapLoaded || !fieldCenter || !fieldPlaced) return
 
     const colorHex = LINE_COLORS.find((c) => c.value === lineColor)?.hex || '#FFFFFF'
-    const coords = calculateFieldCoords(fieldCenter)
 
-    if (fieldOverlayRef.current) {
-      fieldOverlayRef.current.setPath(coords)
-      fieldOverlayRef.current.setOptions({
-        strokeColor: colorHex,
-      })
-    } else {
-      const polygon = new google.maps.Polygon({
-        paths: coords,
+    // Clear existing overlays
+    fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
+    fieldOverlaysRef.current = []
+
+    // Generate field lines
+    const fieldLines = generateSoccerFieldLines(fieldCenter)
+
+    // Create polylines for each line
+    fieldLines.forEach((linePath) => {
+      const polyline = new google.maps.Polyline({
+        path: linePath,
         strokeColor: colorHex,
         strokeOpacity: 1,
-        strokeWeight: 3,
-        fillColor: colorHex,
-        fillOpacity: 0.1,
-        editable: true,
-        draggable: true,
+        strokeWeight: 2,
         map: mapRef.current,
       })
+      fieldOverlaysRef.current.push(polyline)
+    })
 
-      // Handle drag
-      polygon.addListener('dragend', () => {
-        const path = polygon.getPath()
-        if (path) {
-          let sumLat = 0
-          let sumLng = 0
-          path.forEach((latLng) => {
-            sumLat += latLng.lat()
-            sumLng += latLng.lng()
-          })
-          const newCenter = {
-            lat: sumLat / path.getLength(),
-            lng: sumLng / path.getLength(),
-          }
-          setFieldCenter(newCenter)
+    // Add draggable marker at center for repositioning
+    if (dragMarkerRef.current) {
+      dragMarkerRef.current.setPosition(fieldCenter)
+    } else {
+      const marker = new google.maps.Marker({
+        position: fieldCenter,
+        map: mapRef.current,
+        draggable: true,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 12,
+          fillColor: '#22c55e',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+        },
+        title: 'Drag to move field',
+      })
+
+      marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          setFieldCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() })
         }
       })
 
-      fieldOverlayRef.current = polygon
+      dragMarkerRef.current = marker
     }
-  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, calculateFieldCoords])
+  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines])
 
   // Handle template change
   const handleTemplateChange = (templateId: string) => {
@@ -301,9 +462,11 @@ export default function EditorPage() {
 
   // Reset field
   const handleReset = () => {
-    if (fieldOverlayRef.current) {
-      fieldOverlayRef.current.setMap(null)
-      fieldOverlayRef.current = null
+    fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
+    fieldOverlaysRef.current = []
+    if (dragMarkerRef.current) {
+      dragMarkerRef.current.setMap(null)
+      dragMarkerRef.current = null
     }
     setFieldPlaced(false)
     setFieldCenter(null)
