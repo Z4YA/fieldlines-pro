@@ -108,6 +108,8 @@ export default function EditorPage() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [configName, setConfigName] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [pendingEditConfigId, setPendingEditConfigId] = useState<string | null>(null)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
 
   // Field state
   const [fieldPlaced, setFieldPlaced] = useState(false)
@@ -1213,6 +1215,35 @@ export default function EditorPage() {
     [existingConfigs, visibleConfigs, generateConfigFieldLines]
   )
 
+  // Handle edit configuration click
+  const handleEditConfig = useCallback(
+    (configId: string) => {
+      // Check if there's unsaved work
+      if (fieldPlaced && !configurationId) {
+        // User has placed a new field that isn't saved yet
+        setPendingEditConfigId(configId)
+        setShowUnsavedDialog(true)
+      } else {
+        // No unsaved work, navigate directly
+        router.push(`/dashboard/editor?sportsground=${sportsgroundId}&configuration=${configId}`)
+      }
+    },
+    [fieldPlaced, configurationId, sportsgroundId, router]
+  )
+
+  // Handle unsaved dialog actions
+  const handleDiscardAndEdit = () => {
+    setShowUnsavedDialog(false)
+    if (pendingEditConfigId) {
+      router.push(`/dashboard/editor?sportsground=${sportsgroundId}&configuration=${pendingEditConfigId}`)
+    }
+  }
+
+  const handleSaveFirst = () => {
+    setShowUnsavedDialog(false)
+    setShowSaveModal(true)
+  }
+
   // Save configuration
   const handleSave = async () => {
     if (!configName.trim()) {
@@ -1427,15 +1458,15 @@ export default function EditorPage() {
                     {existingConfigs
                       .filter(c => c.id !== configurationId)
                       .map((config) => (
-                        <label
+                        <div
                           key={config.id}
-                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
                         >
                           <input
                             type="checkbox"
                             checked={visibleConfigs.has(config.id)}
                             onChange={() => toggleConfigVisibility(config.id)}
-                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{config.name}</p>
@@ -1444,10 +1475,20 @@ export default function EditorPage() {
                             </p>
                           </div>
                           <div
-                            className="w-3 h-3 rounded-full border border-gray-300"
+                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
                             style={{ backgroundColor: LINE_COLORS.find(c => c.value === config.lineColor)?.hex || '#FFFFFF' }}
                           />
-                        </label>
+                          <button
+                            type="button"
+                            onClick={() => handleEditConfig(config.id)}
+                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            title="Edit this configuration"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </div>
                       ))}
                     {existingConfigs.filter(c => c.id !== configurationId).length === 0 && (
                       <p className="text-xs text-gray-500 text-center py-2">
@@ -1562,6 +1603,39 @@ export default function EditorPage() {
                 </Button>
                 <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
                   {isSaving ? 'Saving...' : configurationId ? 'Update' : 'Save'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Unsaved Work Dialog */}
+      {showUnsavedDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Unsaved Changes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-600">
+                You have an unsaved field configuration. Would you like to save it before editing another configuration?
+              </p>
+              <div className="flex flex-col space-y-2">
+                <Button onClick={handleSaveFirst}>
+                  Save First
+                </Button>
+                <Button variant="outline" onClick={handleDiscardAndEdit}>
+                  Discard & Continue
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowUnsavedDialog(false)
+                    setPendingEditConfigId(null)
+                  }}
+                >
+                  Cancel
                 </Button>
               </div>
             </CardContent>
