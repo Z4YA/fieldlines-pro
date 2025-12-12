@@ -19,7 +19,7 @@ interface LocationSearchProps {
 
 export function LocationSearch({
   onSelect,
-  placeholder = 'Search for an address...',
+  placeholder = 'Search for a park, oval or address...',
   className = '',
   initialValue = '',
 }: LocationSearchProps) {
@@ -45,8 +45,8 @@ export function LocationSearch({
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
           `access_token=${token}&` +
-          `types=address,poi,locality,place&` +
-          `limit=5&` +
+          `types=poi,address,neighborhood,locality,place&` +
+          `limit=8&` +
           `country=au` // Limit to Australia, remove or modify for other countries
       )
 
