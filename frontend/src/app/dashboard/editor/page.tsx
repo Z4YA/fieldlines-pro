@@ -312,14 +312,14 @@ export default function EditorPage() {
       }
 
       // Update edge markers (position AND icon rotation)
-      // Icon rotation should be relative to the edge, not the field rotation
-      // Top/bottom edges: icon points up/down (90 deg base + field rotation)
-      // Left/right edges: icon points left/right (0 deg base + field rotation)
+      // Icon is horizontal double-arrow ↔, so:
+      // - Top/bottom (horizontal edges): rotate 90° to point up/down (perpendicular)
+      // - Left/right (vertical edges): keep at 0° to point left/right (perpendicular)
       const edgeData = [
-        { x: 0, y: halfL, baseIconRotation: 0 },      // top - points up/down perpendicular to edge
-        { x: 0, y: -halfL, baseIconRotation: 0 },     // bottom - points up/down perpendicular to edge
-        { x: -halfW, y: 0, baseIconRotation: 90 },    // left - points left/right perpendicular to edge
-        { x: halfW, y: 0, baseIconRotation: 90 },     // right - points left/right perpendicular to edge
+        { x: 0, y: halfL, baseIconRotation: 90 },     // top - points up/down perpendicular to edge
+        { x: 0, y: -halfL, baseIconRotation: 90 },    // bottom - points up/down perpendicular to edge
+        { x: -halfW, y: 0, baseIconRotation: 0 },     // left - points left/right perpendicular to edge
+        { x: halfW, y: 0, baseIconRotation: 0 },      // right - points left/right perpendicular to edge
       ]
       edgeMarkersRef.current.forEach((marker, idx) => {
         if (marker) {
@@ -729,11 +729,14 @@ export default function EditorPage() {
     // Positions: top, bottom, left, right (in local coords)
     // dir: which direction this edge faces (1 = positive, -1 = negative)
     // baseIconRotation: rotation of icon relative to the edge (perpendicular to edge)
+    // The icon is a horizontal double-arrow ↔, so:
+    // - Top/bottom (horizontal edges): rotate 90° to point up/down
+    // - Left/right (vertical edges): keep at 0° to point left/right
     const edgePositions = [
-      { x: 0, y: halfL, type: 'length' as const, dir: 1, baseIconRotation: 0 },      // top - arrows point up/down
-      { x: 0, y: -halfL, type: 'length' as const, dir: -1, baseIconRotation: 0 },    // bottom - arrows point up/down
-      { x: -halfW, y: 0, type: 'width' as const, dir: -1, baseIconRotation: 90 },    // left - arrows point left/right
-      { x: halfW, y: 0, type: 'width' as const, dir: 1, baseIconRotation: 90 },      // right - arrows point left/right
+      { x: 0, y: halfL, type: 'length' as const, dir: 1, baseIconRotation: 90 },     // top - arrows point up/down
+      { x: 0, y: -halfL, type: 'length' as const, dir: -1, baseIconRotation: 90 },   // bottom - arrows point up/down
+      { x: -halfW, y: 0, type: 'width' as const, dir: -1, baseIconRotation: 0 },     // left - arrows point left/right
+      { x: halfW, y: 0, type: 'width' as const, dir: 1, baseIconRotation: 0 },       // right - arrows point left/right
     ]
 
     // Only recreate edge markers if they don't exist or count changed
