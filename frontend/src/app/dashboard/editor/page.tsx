@@ -302,8 +302,8 @@ export default function EditorPage() {
         return { lat: center.lat + dLat, lng: center.lng + dLng }
       }
 
-      // Icon paths - includes filled rectangle for hit area
-      const resizeIconH = 'M -10,-5 L 10,-5 L 10,5 L -10,5 Z M -10,0 L -6,0 L -6,-4 L -12,0 L -6,4 L -6,0 M 10,0 L 6,0 L 6,-4 L 12,0 L 6,4 L 6,0'
+      // Use built-in symbol for reliable drag detection
+      const resizeIconPath = google.maps.SymbolPath.FORWARD_CLOSED_ARROW
       const rotateIcon = 'M 0,-8 A 8,8 0 1,1 -8,0 M -8,0 L -5,-3 M -8,0 L -5,3'
 
       // Update center marker
@@ -327,13 +327,12 @@ export default function EditorPage() {
         if (marker) {
           marker.setPosition(toPos(edgeData[idx].x, edgeData[idx].y))
           marker.setIcon({
-            path: resizeIconH,
+            path: resizeIconPath,
             fillColor: '#3b82f6',
-            fillOpacity: 0.8,
+            fillOpacity: 1,
             strokeColor: '#ffffff',
-            strokeWeight: 1.5,
-            scale: 1.2,
-            anchor: new google.maps.Point(0, 0),
+            strokeWeight: 2,
+            scale: 6,
             rotation: edgeData[idx].baseIconRotation - rot,
           })
         }
@@ -723,10 +722,8 @@ export default function EditorPage() {
     const halfW = fieldWidth / 2
     const colorHexForDrag = colorHex
 
-    // Standard resize icon path (two arrows pointing outward with a line)
-    // Horizontal resize icon ↔ - includes a filled rectangle for hit area
-    const resizeIconH = 'M -10,-5 L 10,-5 L 10,5 L -10,5 Z M -10,0 L -6,0 L -6,-4 L -12,0 L -6,4 L -6,0 M 10,0 L 6,0 L 6,-4 L 12,0 L 6,4 L 6,0'
-    // Vertical resize icon (same but rotated via the rotation property)
+    // Use built-in symbol for reliable drag detection
+    const resizeIconPath = google.maps.SymbolPath.FORWARD_CLOSED_ARROW
 
     // Positions: top, bottom, left, right (in local coords)
     // dir: which direction this edge faces (1 = positive, -1 = negative)
@@ -752,13 +749,12 @@ export default function EditorPage() {
           map: mapRef.current,
           draggable: true,
           icon: {
-            path: resizeIconH,
+            path: resizeIconPath,
             fillColor: '#3b82f6',
-            fillOpacity: 0.8,
+            fillOpacity: 1,
             strokeColor: '#ffffff',
-            strokeWeight: 1.5,
-            scale: 1.2,
-            anchor: new google.maps.Point(0, 0),
+            strokeWeight: 2,
+            scale: 6,
             rotation: edge.baseIconRotation - rotation,
           },
           title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
@@ -876,13 +872,12 @@ export default function EditorPage() {
         const pos = toLatLng(fieldCenter, edge.x, edge.y)
         edgeMarkersRef.current[idx].setPosition(pos)
         edgeMarkersRef.current[idx].setIcon({
-          path: resizeIconH,
+          path: resizeIconPath,
           fillColor: '#3b82f6',
-          fillOpacity: 0.8,
+          fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 1.5,
-          scale: 1.2,
-          anchor: new google.maps.Point(0, 0),
+          strokeWeight: 2,
+          scale: 6,
           rotation: edge.baseIconRotation - rotation,
         })
       })
