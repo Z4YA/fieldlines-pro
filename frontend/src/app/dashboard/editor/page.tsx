@@ -647,18 +647,19 @@ export default function EditorPage() {
 
       edgePositions.forEach((edge, idx) => {
         const pos = toLatLng(fieldCenter, edge.x, edge.y)
+        // Simple square resize handle
         const marker = new google.maps.Marker({
           position: pos,
           map: mapRef.current,
           draggable: true,
           icon: {
-            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-            scale: 5,
-            fillColor: '#3b82f6',
+            path: 'M -5,-5 L 5,-5 L 5,5 L -5,5 Z',
+            fillColor: '#ffffff',
             fillOpacity: 1,
-            strokeColor: '#ffffff',
+            strokeColor: '#3b82f6',
             strokeWeight: 2,
-            rotation: edge.type === 'length' ? (rotation + (edge.dir === 1 ? 0 : 180)) : (rotation + (edge.dir === 1 ? 90 : 270)),
+            scale: 1,
+            anchor: new google.maps.Point(0, 0),
           },
           title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
         })
@@ -721,15 +722,6 @@ export default function EditorPage() {
       edgePositions.forEach((edge, idx) => {
         const pos = toLatLng(fieldCenter, edge.x, edge.y)
         edgeMarkersRef.current[idx].setPosition(pos)
-        edgeMarkersRef.current[idx].setIcon({
-          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale: 5,
-          fillColor: '#3b82f6',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          rotation: edge.type === 'length' ? (rotation + (edge.dir === 1 ? 0 : 180)) : (rotation + (edge.dir === 1 ? 90 : 270)),
-        })
       })
     }
 
@@ -748,18 +740,21 @@ export default function EditorPage() {
 
       cornerPositions.forEach((corner, idx) => {
         const pos = toLatLng(fieldCenter, corner.x, corner.y)
+        // Circular rotation arrow icon
         const marker = new google.maps.Marker({
           position: pos,
           map: mapRef.current,
           draggable: true,
           icon: {
-            path: 'M -6,-6 L 6,-6 L 6,6 L -6,6 Z M -3,-3 L 3,-3 L 3,3 L -3,3 Z',
-            fillColor: '#f59e0b',
+            // Circular arrow (rotate icon) - simplified curved arrow
+            path: 'M 0,-7 A 7,7 0 1,1 -7,0 L -7,-3 L -10,0 L -7,3 L -7,0 A 7,7 0 0,0 0,-7 Z',
+            fillColor: '#22c55e',
             fillOpacity: 1,
             strokeColor: '#ffffff',
-            strokeWeight: 1,
-            scale: 1,
+            strokeWeight: 1.5,
+            scale: 1.2,
             anchor: new google.maps.Point(0, 0),
+            rotation: idx * 90, // Rotate each corner's icon differently
           },
           title: 'Drag to rotate',
         })
@@ -980,18 +975,20 @@ export default function EditorPage() {
             {fieldPlaced && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <h3 className="font-medium text-gray-700 mb-2 text-sm">Controls</h3>
-                <div className="text-xs text-gray-600 space-y-1">
+                <div className="text-xs text-gray-600 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span>Drag to move field</span>
+                    <span className="w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow"></span>
+                    <span>Drag center to move</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 bg-blue-500" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}></span>
-                    <span>Drag to resize</span>
+                    <span className="w-3 h-3 bg-white border-2 border-blue-500"></span>
+                    <span>Drag edges to resize</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 bg-amber-500 border border-white"></span>
-                    <span>Drag to rotate</span>
+                    <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                    </svg>
+                    <span>Drag corners to rotate</span>
                   </div>
                 </div>
               </div>
