@@ -191,7 +191,7 @@ export default function EditorPage() {
 
         const map = new google.maps.Map(mapContainerRef.current, {
           center,
-          zoom: sportsground?.defaultZoom || 18,
+          zoom: Math.max(sportsground?.defaultZoom || 19, 18),
           mapTypeId: 'satellite',
           tilt: 0,
           disableDefaultUI: false,
