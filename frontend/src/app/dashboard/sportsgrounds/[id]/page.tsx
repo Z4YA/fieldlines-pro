@@ -161,14 +161,20 @@ export default function SportsgroundDetailPage() {
             <CardTitle className="text-lg">Location</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <GoogleMap
-              initialCenter={{ lat: sportsground.latitude, lng: sportsground.longitude }}
-              initialZoom={sportsground.defaultZoom}
-              markerPosition={{ lat: sportsground.latitude, lng: sportsground.longitude }}
-              className="h-[400px] rounded-b-lg"
-              interactive={true}
-              mapType="satellite"
-            />
+            {sportsground.latitude != null && sportsground.longitude != null ? (
+              <GoogleMap
+                initialCenter={{ lat: sportsground.latitude, lng: sportsground.longitude }}
+                initialZoom={sportsground.defaultZoom || 18}
+                markerPosition={{ lat: sportsground.latitude, lng: sportsground.longitude }}
+                className="h-[400px] rounded-b-lg"
+                interactive={true}
+                mapType="satellite"
+              />
+            ) : (
+              <div className="h-[400px] flex items-center justify-center bg-gray-100 rounded-b-lg">
+                <p className="text-gray-500">Location not available</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -186,11 +192,11 @@ export default function SportsgroundDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Latitude</p>
-                  <p className="text-gray-900">{sportsground.latitude.toFixed(6)}</p>
+                  <p className="text-gray-900">{sportsground.latitude?.toFixed(6) ?? 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Longitude</p>
-                  <p className="text-gray-900">{sportsground.longitude.toFixed(6)}</p>
+                  <p className="text-gray-900">{sportsground.longitude?.toFixed(6) ?? 'N/A'}</p>
                 </div>
               </div>
               {sportsground.notes && (
@@ -231,7 +237,7 @@ export default function SportsgroundDetailPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-medium text-gray-900">{config.name}</p>
-                          <p className="text-sm text-gray-500">{config.template.name}</p>
+                          <p className="text-sm text-gray-500">{config.template?.name ?? 'Unknown template'}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm text-gray-900">
@@ -240,10 +246,10 @@ export default function SportsgroundDetailPage() {
                           <div className="flex items-center justify-end mt-1">
                             <div
                               className="w-4 h-4 rounded border mr-1"
-                              style={{ backgroundColor: config.lineColor.toLowerCase() }}
+                              style={{ backgroundColor: config.lineColor?.toLowerCase() ?? '#ffffff' }}
                             ></div>
                             <span className="text-sm text-gray-500 capitalize">
-                              {config.lineColor}
+                              {config.lineColor ?? 'white'}
                             </span>
                           </div>
                         </div>
