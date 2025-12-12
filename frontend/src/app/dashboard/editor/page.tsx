@@ -334,7 +334,7 @@ export default function EditorPage() {
             strokeWeight: 2,
             scale: 1,
             anchor: new google.maps.Point(0, 0),
-            rotation: edgeData[idx].baseIconRotation + rot,
+            rotation: edgeData[idx].baseIconRotation - rot,
           })
         }
       })
@@ -357,7 +357,7 @@ export default function EditorPage() {
             strokeWeight: 2.5,
             scale: 1.2,
             anchor: new google.maps.Point(0, 0),
-            rotation: cornerData[idx].iconRot + rot,
+            rotation: cornerData[idx].iconRot - rot,
           })
         }
       })
@@ -759,7 +759,7 @@ export default function EditorPage() {
             strokeWeight: 2,
             scale: 1,
             anchor: new google.maps.Point(0, 0),
-            rotation: edge.baseIconRotation + rotation,
+            rotation: edge.baseIconRotation - rotation,
           },
           title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
         })
@@ -883,7 +883,7 @@ export default function EditorPage() {
           strokeWeight: 2,
           scale: 1,
           anchor: new google.maps.Point(0, 0),
-          rotation: edge.baseIconRotation + rotation,
+          rotation: edge.baseIconRotation - rotation,
         })
       })
     }
@@ -917,7 +917,7 @@ export default function EditorPage() {
             strokeWeight: 2.5,
             scale: 1.2,
             anchor: new google.maps.Point(0, 0),
-            rotation: corner.iconRot + rotation,
+            rotation: corner.iconRot - rotation,
           },
           title: 'Drag to rotate',
         })
@@ -986,7 +986,7 @@ export default function EditorPage() {
           strokeWeight: 2.5,
           scale: 1.2,
           anchor: new google.maps.Point(0, 0),
-          rotation: corner.iconRot + rotation,
+          rotation: corner.iconRot - rotation,
         })
       })
     }
