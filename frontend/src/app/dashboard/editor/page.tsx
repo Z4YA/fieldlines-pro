@@ -312,16 +312,12 @@ export default function EditorPage() {
       }
 
       // Update edge markers (position AND icon rotation)
-      // Icon is horizontal double-arrow ↔ at 0° (points East-West)
-      // Top/bottom edges: drag along LENGTH axis to resize length → icon points along length axis
-      // Left/right edges: drag along WIDTH axis to resize width → icon points along width axis
-      // At rotation 0: length=North, width=East
-      // Icon rotation = baseIconRotation + fieldRotation
+      // FORWARD_CLOSED_ARROW points up at 0°, arrows point outward from each edge
       const edgeData = [
-        { x: 0, y: halfL, baseIconRotation: 90 },     // top - icon along length axis (up-down at rot=0)
-        { x: 0, y: -halfL, baseIconRotation: 90 },    // bottom - icon along length axis
-        { x: -halfW, y: 0, baseIconRotation: 0 },     // left - icon along width axis (left-right at rot=0)
-        { x: halfW, y: 0, baseIconRotation: 0 },      // right - icon along width axis
+        { x: 0, y: halfL, baseIconRotation: 0 },       // top - points up
+        { x: 0, y: -halfL, baseIconRotation: 180 },    // bottom - points down
+        { x: -halfW, y: 0, baseIconRotation: 270 },    // left - points left
+        { x: halfW, y: 0, baseIconRotation: 90 },      // right - points right
       ]
       edgeMarkersRef.current.forEach((marker, idx) => {
         if (marker) {
@@ -727,14 +723,16 @@ export default function EditorPage() {
 
     // Positions: top, bottom, left, right (in local coords)
     // dir: which direction this edge faces (1 = positive, -1 = negative)
-    // baseIconRotation: The icon is a horizontal double-arrow ↔ at 0° (points East-West)
-    // - Top/bottom edges: icon should point along LENGTH axis → 90° base (up-down at rot=0)
-    // - Left/right edges: icon should point along WIDTH axis → 0° base (left-right at rot=0)
+    // baseIconRotation: FORWARD_CLOSED_ARROW points up at 0°, so:
+    // - Top edge: point up (outward) → 0°
+    // - Bottom edge: point down (outward) → 180°
+    // - Left edge: point left (outward) → 270°
+    // - Right edge: point right (outward) → 90°
     const edgePositions = [
-      { x: 0, y: halfL, type: 'length' as const, dir: 1, baseIconRotation: 90 },     // top
-      { x: 0, y: -halfL, type: 'length' as const, dir: -1, baseIconRotation: 90 },   // bottom
-      { x: -halfW, y: 0, type: 'width' as const, dir: -1, baseIconRotation: 0 },     // left
-      { x: halfW, y: 0, type: 'width' as const, dir: 1, baseIconRotation: 0 },       // right
+      { x: 0, y: halfL, type: 'length' as const, dir: 1, baseIconRotation: 0 },       // top - points up
+      { x: 0, y: -halfL, type: 'length' as const, dir: -1, baseIconRotation: 180 },   // bottom - points down
+      { x: -halfW, y: 0, type: 'width' as const, dir: -1, baseIconRotation: 270 },    // left - points left
+      { x: halfW, y: 0, type: 'width' as const, dir: 1, baseIconRotation: 90 },       // right - points right
     ]
 
     // Only recreate edge markers if they don't exist or count changed
