@@ -240,17 +240,17 @@ export default function EditorPage() {
 
       const rotationRad = ((rot ?? rotation) * Math.PI) / 180
 
-      // Convert meters to degrees
-      const dLat = y / metersPerDegreeLat
-      const dLng = x / metersPerDegreeLng
+      // Rotate in meters first (around origin)
+      const rotatedX = x * Math.cos(rotationRad) - y * Math.sin(rotationRad)
+      const rotatedY = x * Math.sin(rotationRad) + y * Math.cos(rotationRad)
 
-      // Apply rotation
-      const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
-      const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
+      // Then convert to lat/lng
+      const dLat = rotatedY / metersPerDegreeLat
+      const dLng = rotatedX / metersPerDegreeLng
 
       return {
-        lat: center.lat + rotatedLat,
-        lng: center.lng + rotatedLng,
+        lat: center.lat + dLat,
+        lng: center.lng + dLng,
       }
     },
     [rotation]
@@ -264,17 +264,16 @@ export default function EditorPage() {
 
       const rotationRad = ((rot ?? rotation) * Math.PI) / 180
 
-      // Get the difference in degrees
+      // Get the difference in degrees and convert to meters first
       const dLat = point.lat - center.lat
       const dLng = point.lng - center.lng
 
-      // Reverse rotation
-      const unrotatedLat = dLat * Math.cos(-rotationRad) - dLng * Math.sin(-rotationRad)
-      const unrotatedLng = dLat * Math.sin(-rotationRad) + dLng * Math.cos(-rotationRad)
+      const metersY = dLat * metersPerDegreeLat
+      const metersX = dLng * metersPerDegreeLng
 
-      // Convert degrees to meters
-      const y = unrotatedLat * metersPerDegreeLat
-      const x = unrotatedLng * metersPerDegreeLng
+      // Then reverse the rotation in meters
+      const x = metersX * Math.cos(-rotationRad) - metersY * Math.sin(-rotationRad)
+      const y = metersX * Math.sin(-rotationRad) + metersY * Math.cos(-rotationRad)
 
       return { x, y }
     },
@@ -287,16 +286,20 @@ export default function EditorPage() {
       const halfL = length / 2
       const halfW = width / 2
 
-      // Helper to convert coords with specific rotation
+      // Helper to convert coords with specific rotation - rotate in meters first
       const toPos = (x: number, y: number) => {
         const metersPerDegreeLat = 111320
         const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
         const rotationRad = (rot * Math.PI) / 180
-        const dLat = y / metersPerDegreeLat
-        const dLng = x / metersPerDegreeLng
-        const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
-        const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
-        return { lat: center.lat + rotatedLat, lng: center.lng + rotatedLng }
+
+        // Rotate in meters first
+        const rotatedX = x * Math.cos(rotationRad) - y * Math.sin(rotationRad)
+        const rotatedY = x * Math.sin(rotationRad) + y * Math.cos(rotationRad)
+
+        // Then convert to lat/lng
+        const dLat = rotatedY / metersPerDegreeLat
+        const dLng = rotatedX / metersPerDegreeLng
+        return { lat: center.lat + dLat, lng: center.lng + dLng }
       }
 
       // Icon paths
@@ -371,16 +374,21 @@ export default function EditorPage() {
       const halfL = L / 2
       const halfW = W / 2
 
-      // Helper with explicit rotation
+      // Helper with explicit rotation - rotate in meters first, then convert to lat/lng
       const toLatLngLocal = (x: number, y: number) => {
         const metersPerDegreeLat = 111320
         const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
         const rotationRad = (rot * Math.PI) / 180
-        const dLat = y / metersPerDegreeLat
-        const dLng = x / metersPerDegreeLng
-        const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
-        const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
-        return { lat: center.lat + rotatedLat, lng: center.lng + rotatedLng }
+
+        // Rotate the point in meters around origin first
+        const rotatedX = x * Math.cos(rotationRad) - y * Math.sin(rotationRad)
+        const rotatedY = x * Math.sin(rotationRad) + y * Math.cos(rotationRad)
+
+        // Then convert to lat/lng
+        const dLat = rotatedY / metersPerDegreeLat
+        const dLng = rotatedX / metersPerDegreeLng
+
+        return { lat: center.lat + dLat, lng: center.lng + dLng }
       }
 
       const penaltyDepth = 16.5
