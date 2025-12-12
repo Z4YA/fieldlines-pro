@@ -18,6 +18,17 @@ interface Sportsground {
   defaultZoom: number
 }
 
+interface Configuration {
+  id: string
+  name: string
+  latitude: number
+  longitude: number
+  rotationDegrees: number
+  lengthMeters: number
+  widthMeters: number
+  lineColor: string
+}
+
 interface FieldTemplate {
   id: string
   sport: string
@@ -88,6 +99,9 @@ export default function EditorPage() {
   const [sportsground, setSportsground] = useState<Sportsground | null>(null)
   const [templates, setTemplates] = useState<FieldTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<FieldTemplate | null>(null)
+  const [existingConfigs, setExistingConfigs] = useState<Configuration[]>([])
+  const [visibleConfigs, setVisibleConfigs] = useState<Set<string>>(new Set())
+  const configOverlaysRef = useRef<Map<string, google.maps.Polyline[]>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [isMapLoaded, setIsMapLoaded] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -146,6 +160,12 @@ export default function EditorPage() {
         const groundResponse = await api.getSportsground(sportsgroundId)
         if (groundResponse.data) {
           setSportsground(groundResponse.data as Sportsground)
+        }
+
+        // Load existing configurations for this sportsground
+        const configsResponse = await api.getConfigurations(sportsgroundId)
+        if (configsResponse.data) {
+          setExistingConfigs(configsResponse.data as Configuration[])
         }
       }
 
@@ -1031,6 +1051,79 @@ export default function EditorPage() {
     setRotation(0)
   }
 
+  // Generate field lines for a configuration (simplified version for overlay display)
+  const generateConfigFieldLines = useCallback(
+    (config: Configuration) => {
+      const center = { lat: config.latitude, lng: config.longitude }
+      const L = config.lengthMeters
+      const W = config.widthMeters
+      const rot = config.rotationDegrees
+      const halfL = L / 2
+      const halfW = W / 2
+
+      const metersPerDegreeLat = 111320
+      const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+      const rotationRad = (rot * Math.PI) / 180
+
+      const toLatLngLocal = (x: number, y: number) => {
+        const rotatedX = x * Math.cos(rotationRad) - y * Math.sin(rotationRad)
+        const rotatedY = x * Math.sin(rotationRad) + y * Math.cos(rotationRad)
+        const dLat = rotatedY / metersPerDegreeLat
+        const dLng = rotatedX / metersPerDegreeLng
+        return { lat: center.lat + dLat, lng: center.lng + dLng }
+      }
+
+      // Just draw the outer boundary for existing configs
+      return [
+        toLatLngLocal(-halfW, -halfL),
+        toLatLngLocal(halfW, -halfL),
+        toLatLngLocal(halfW, halfL),
+        toLatLngLocal(-halfW, halfL),
+        toLatLngLocal(-halfW, -halfL),
+      ]
+    },
+    []
+  )
+
+  // Toggle configuration visibility
+  const toggleConfigVisibility = useCallback(
+    (configId: string) => {
+      if (!mapRef.current) return
+
+      const config = existingConfigs.find(c => c.id === configId)
+      if (!config) return
+
+      const newVisible = new Set(visibleConfigs)
+
+      if (visibleConfigs.has(configId)) {
+        // Hide it
+        newVisible.delete(configId)
+        const overlays = configOverlaysRef.current.get(configId)
+        if (overlays) {
+          overlays.forEach(o => o.setMap(null))
+          configOverlaysRef.current.delete(configId)
+        }
+      } else {
+        // Show it
+        newVisible.add(configId)
+        const path = generateConfigFieldLines(config)
+        const colorHex = LINE_COLORS.find(c => c.value === config.lineColor)?.hex || '#FFFFFF'
+
+        const polyline = new google.maps.Polyline({
+          path,
+          strokeColor: colorHex,
+          strokeOpacity: 0.6,
+          strokeWeight: 2,
+          map: mapRef.current,
+        })
+        configOverlaysRef.current.set(configId, [polyline])
+      }
+
+      setVisibleConfigs(newVisible)
+    },
+    [existingConfigs, visibleConfigs, generateConfigFieldLines]
+  )
+
   // Save configuration
   const handleSave = async () => {
     if (!configName.trim()) {
@@ -1234,42 +1327,48 @@ export default function EditorPage() {
               </CardContent>
             </Card>
 
-            {/* Rotation */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Rotation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Input
-                    type="number"
-                    value={rotation}
-                    onChange={(e) => setRotation(parseInt(e.target.value) || 0)}
-                    min={0}
-                    max={359}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <span className="text-sm text-gray-500">degrees</span>
-                </div>
-                <input
-                  type="range"
-                  value={rotation}
-                  onChange={(e) => setRotation(parseInt(e.target.value))}
-                  min={0}
-                  max={359}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <button type="button" onClick={() => setRotation(0)} className="hover:text-green-600">0°</button>
-                  <button type="button" onClick={() => setRotation(45)} className="hover:text-green-600">45°</button>
-                  <button type="button" onClick={() => setRotation(90)} className="hover:text-green-600">90°</button>
-                  <button type="button" onClick={() => setRotation(135)} className="hover:text-green-600">135°</button>
-                  <button type="button" onClick={() => setRotation(180)} className="hover:text-green-600">180°</button>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Existing Configurations */}
+            {existingConfigs.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Existing Configurations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {existingConfigs
+                      .filter(c => c.id !== configurationId)
+                      .map((config) => (
+                        <label
+                          key={config.id}
+                          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={visibleConfigs.has(config.id)}
+                            onChange={() => toggleConfigVisibility(config.id)}
+                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{config.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {config.lengthMeters}m x {config.widthMeters}m
+                            </p>
+                          </div>
+                          <div
+                            className="w-3 h-3 rounded-full border border-gray-300"
+                            style={{ backgroundColor: LINE_COLORS.find(c => c.value === config.lineColor)?.hex || '#FFFFFF' }}
+                          />
+                        </label>
+                      ))}
+                    {existingConfigs.filter(c => c.id !== configurationId).length === 0 && (
+                      <p className="text-xs text-gray-500 text-center py-2">
+                        No other configurations
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Line Color */}
             <Card>
