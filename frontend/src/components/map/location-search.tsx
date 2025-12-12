@@ -17,6 +17,26 @@ interface LocationSearchProps {
   initialValue?: string
 }
 
+interface GooglePlacePrediction {
+  place_id: string
+  description: string
+  structured_formatting: {
+    main_text: string
+    secondary_text: string
+  }
+}
+
+interface GooglePlaceDetails {
+  geometry: {
+    location: {
+      lat: number
+      lng: number
+    }
+  }
+  formatted_address: string
+  name: string
+}
+
 export function LocationSearch({
   onSelect,
   placeholder = 'Search for a park, oval or address...',
@@ -25,55 +45,86 @@ export function LocationSearch({
 }: LocationSearchProps) {
   const [query, setQuery] = useState(initialValue)
   const [results, setResults] = useState<SearchResult[]>([])
+  const [predictions, setPredictions] = useState<GooglePlacePrediction[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Search for locations using Mapbox Geocoding API
+  const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY
+
+  // Search for locations using Google Places Autocomplete API
   const searchLocations = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 3) {
       setResults([])
+      setPredictions([])
       return
     }
 
     setIsLoading(true)
 
     try {
-      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+      // Use Google Places Autocomplete API
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?` +
-          `access_token=${token}&` +
-          `types=poi,address,neighborhood,locality,place&` +
-          `limit=8&` +
-          `country=au` // Limit to Australia, remove or modify for other countries
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?` +
+          `input=${encodeURIComponent(searchQuery)}&` +
+          `types=establishment|park|locality|sublocality|geocode&` +
+          `components=country:au&` +
+          `key=${GOOGLE_API_KEY}`
       )
 
       if (!response.ok) throw new Error('Search failed')
 
       const data = await response.json()
 
-      const searchResults: SearchResult[] = data.features.map((feature: {
-        id: string
-        place_name: string
-        center: [number, number]
-        text: string
-        context?: Array<{ text: string }>
-      }) => ({
-        id: feature.id,
-        placeName: feature.place_name,
-        center: feature.center,
-        address: feature.place_name,
-      }))
+      if (data.status === 'OK' && data.predictions) {
+        setPredictions(data.predictions)
 
-      setResults(searchResults)
-      setIsOpen(searchResults.length > 0)
+        // Convert to SearchResult format (without coordinates yet)
+        const searchResults: SearchResult[] = data.predictions.map((prediction: GooglePlacePrediction) => ({
+          id: prediction.place_id,
+          placeName: prediction.description,
+          center: [0, 0] as [number, number], // Will be filled on selection
+          address: prediction.description,
+        }))
+
+        setResults(searchResults)
+        setIsOpen(searchResults.length > 0)
+      } else {
+        setResults([])
+        setPredictions([])
+      }
     } catch (error) {
-      console.error('Geocoding error:', error)
+      console.error('Google Places error:', error)
       setResults([])
+      setPredictions([])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Get place details (coordinates) when a place is selected
+  const getPlaceDetails = async (placeId: string): Promise<GooglePlaceDetails | null> => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?` +
+          `place_id=${placeId}&` +
+          `fields=geometry,formatted_address,name&` +
+          `key=${GOOGLE_API_KEY}`
+      )
+
+      if (!response.ok) throw new Error('Failed to get place details')
+
+      const data = await response.json()
+
+      if (data.status === 'OK' && data.result) {
+        return data.result
+      }
+      return null
+    } catch (error) {
+      console.error('Place details error:', error)
+      return null
     }
   }
 
@@ -132,11 +183,30 @@ export function LocationSearch({
   }
 
   // Handle result selection
-  const handleSelect = (result: SearchResult) => {
+  const handleSelect = async (result: SearchResult) => {
+    setIsLoading(true)
     setQuery(result.placeName)
     setIsOpen(false)
     setSelectedIndex(-1)
-    onSelect(result)
+
+    // Get the actual coordinates from Place Details API
+    const details = await getPlaceDetails(result.id)
+
+    if (details) {
+      const finalResult: SearchResult = {
+        id: result.id,
+        placeName: details.name || result.placeName,
+        center: [details.geometry.location.lng, details.geometry.location.lat],
+        address: details.formatted_address || result.address,
+      }
+      setQuery(finalResult.address)
+      onSelect(finalResult)
+    } else {
+      // Fallback if details fetch fails
+      onSelect(result)
+    }
+
+    setIsLoading(false)
   }
 
   // Get user's current location
@@ -151,27 +221,26 @@ export function LocationSearch({
       async (position) => {
         const { latitude, longitude } = position.coords
 
-        // Reverse geocode to get address
+        // Reverse geocode using Google
         try {
-          const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
           const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?` +
-              `access_token=${token}&` +
-              `types=address,poi&` +
-              `limit=1`
+            `https://maps.googleapis.com/maps/api/geocode/json?` +
+              `latlng=${latitude},${longitude}&` +
+              `key=${GOOGLE_API_KEY}`
           )
 
           if (response.ok) {
             const data = await response.json()
-            if (data.features && data.features.length > 0) {
-              const feature = data.features[0]
+            if (data.status === 'OK' && data.results && data.results.length > 0) {
+              const place = data.results[0]
               const result: SearchResult = {
-                id: feature.id,
-                placeName: feature.place_name,
+                id: place.place_id,
+                placeName: place.formatted_address,
                 center: [longitude, latitude],
-                address: feature.place_name,
+                address: place.formatted_address,
               }
-              handleSelect(result)
+              setQuery(result.address)
+              onSelect(result)
             } else {
               // No address found, use coordinates
               const result: SearchResult = {
@@ -180,7 +249,8 @@ export function LocationSearch({
                 center: [longitude, latitude],
                 address: 'Current Location',
               }
-              handleSelect(result)
+              setQuery(result.placeName)
+              onSelect(result)
             }
           }
         } catch (error) {
@@ -240,14 +310,14 @@ export function LocationSearch({
       {/* Search Results Dropdown */}
       {isOpen && results.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-          {results.map((result, index) => (
+          {predictions.map((prediction, index) => (
             <button
-              key={result.id}
+              key={prediction.place_id}
               type="button"
-              onClick={() => handleSelect(result)}
+              onClick={() => handleSelect(results[index])}
               className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
                 index === selectedIndex ? 'bg-gray-50' : ''
-              } ${index !== results.length - 1 ? 'border-b border-gray-100' : ''}`}
+              } ${index !== predictions.length - 1 ? 'border-b border-gray-100' : ''}`}
             >
               <div className="flex items-start space-x-3">
                 <svg
@@ -265,10 +335,10 @@ export function LocationSearch({
                 </svg>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {result.placeName.split(',')[0]}
+                    {prediction.structured_formatting.main_text}
                   </p>
                   <p className="text-sm text-gray-500 truncate">
-                    {result.placeName.split(',').slice(1).join(',')}
+                    {prediction.structured_formatting.secondary_text}
                   </p>
                 </div>
               </div>
