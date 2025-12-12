@@ -1,37 +1,37 @@
-import nodemailer from 'nodemailer'
-
-// Create transporter based on environment
-const createTransporter = () => {
-  if (process.env.NODE_ENV === 'production') {
-    // Production: Use SendGrid or similar
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.sendgrid.net',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER || 'apikey',
-        pass: process.env.SMTP_PASSWORD || process.env.SENDGRID_API_KEY,
-      },
-    })
-  } else {
-    // Development: Use Ethereal for testing
-    return nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.ETHEREAL_USER || 'ethereal.user@ethereal.email',
-        pass: process.env.ETHEREAL_PASS || 'ethereal_password',
-      },
-    })
-  }
-}
-
-const transporter = createTransporter()
-
-const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@fieldlinespro.com'
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+const FROM_EMAIL = process.env.EMAIL_FROM || 'onboarding@resend.dev'
 const FROM_NAME = process.env.FROM_NAME || 'FieldLines Pro'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:9500'
+
+// Send email using Resend API
+async function sendEmail(to: string, subject: string, html: string) {
+  if (!RESEND_API_KEY) {
+    console.log('RESEND_API_KEY not configured, skipping email send')
+    console.log(`Would send email to ${to}: ${subject}`)
+    return
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Resend API error: ${error}`)
+  }
+
+  return response.json()
+}
 
 // Email templates
 export async function sendVerificationEmail(email: string, token: string) {
@@ -72,12 +72,7 @@ export async function sendVerificationEmail(email: string, token: string) {
   `
 
   try {
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-      to: email,
-      subject: 'Verify your FieldLines Pro account',
-      html,
-    })
+    await sendEmail(email, 'Verify your FieldLines Pro account', html)
     console.log(`Verification email sent to ${email}`)
   } catch (error) {
     console.error('Failed to send verification email:', error)
@@ -124,12 +119,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   `
 
   try {
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-      to: email,
-      subject: 'Reset your FieldLines Pro password',
-      html,
-    })
+    await sendEmail(email, 'Reset your FieldLines Pro password', html)
     console.log(`Password reset email sent to ${email}`)
   } catch (error) {
     console.error('Failed to send password reset email:', error)
@@ -231,12 +221,7 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
   `
 
   try {
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-      to: data.to,
-      subject: `Booking Request Received - ${data.referenceNumber}`,
-      html,
-    })
+    await sendEmail(data.to, `Booking Request Received - ${data.referenceNumber}`, html)
     console.log(`Booking confirmation email sent to ${data.to}`)
   } catch (error) {
     console.error('Failed to send booking confirmation email:', error)
@@ -340,12 +325,7 @@ export async function sendProviderNotificationEmail(data: ProviderNotificationDa
   `
 
   try {
-    await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-      to: PROVIDER_EMAIL,
-      subject: `[NEW BOOKING] ${data.referenceNumber} - ${data.sportsgroundName}`,
-      html,
-    })
+    await sendEmail(PROVIDER_EMAIL, `[NEW BOOKING] ${data.referenceNumber} - ${data.sportsgroundName}`, html)
     console.log(`Provider notification email sent for ${data.referenceNumber}`)
   } catch (error) {
     console.error('Failed to send provider notification email:', error)
