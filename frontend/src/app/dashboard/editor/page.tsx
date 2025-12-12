@@ -1051,9 +1051,9 @@ export default function EditorPage() {
     setRotation(0)
   }
 
-  // Generate field lines for a configuration (simplified version for overlay display)
+  // Generate full field lines for a configuration
   const generateConfigFieldLines = useCallback(
-    (config: Configuration) => {
+    (config: Configuration): { lat: number; lng: number }[][] => {
       const center = { lat: config.latitude, lng: config.longitude }
       const L = config.lengthMeters
       const W = config.widthMeters
@@ -1073,14 +1073,99 @@ export default function EditorPage() {
         return { lat: center.lat + dLat, lng: center.lng + dLng }
       }
 
-      // Just draw the outer boundary for existing configs
-      return [
+      const penaltyDepth = 16.5
+      const penaltyWidth = 40.3 / 2
+      const goalAreaDepth = 5.5
+      const goalAreaWidth = 18.3 / 2
+      const centerCircleRadius = 9.15
+      const penaltySpotDist = 11
+      const penaltyArcRadius = 9.15
+      const cornerArcRadius = 1
+
+      const lines: { lat: number; lng: number }[][] = []
+
+      // Outer boundary
+      lines.push([
         toLatLngLocal(-halfW, -halfL),
         toLatLngLocal(halfW, -halfL),
         toLatLngLocal(halfW, halfL),
         toLatLngLocal(-halfW, halfL),
         toLatLngLocal(-halfW, -halfL),
-      ]
+      ])
+
+      // Center line
+      lines.push([toLatLngLocal(-halfW, 0), toLatLngLocal(halfW, 0)])
+
+      // Center circle
+      const centerCircle: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 36; i++) {
+        const angle = (i / 36) * 2 * Math.PI
+        centerCircle.push(toLatLngLocal(centerCircleRadius * Math.cos(angle), centerCircleRadius * Math.sin(angle)))
+      }
+      lines.push(centerCircle)
+
+      // Penalty areas
+      lines.push([
+        toLatLngLocal(-penaltyWidth, halfL),
+        toLatLngLocal(-penaltyWidth, halfL - penaltyDepth),
+        toLatLngLocal(penaltyWidth, halfL - penaltyDepth),
+        toLatLngLocal(penaltyWidth, halfL),
+      ])
+      lines.push([
+        toLatLngLocal(-penaltyWidth, -halfL),
+        toLatLngLocal(-penaltyWidth, -halfL + penaltyDepth),
+        toLatLngLocal(penaltyWidth, -halfL + penaltyDepth),
+        toLatLngLocal(penaltyWidth, -halfL),
+      ])
+
+      // Goal areas
+      lines.push([
+        toLatLngLocal(-goalAreaWidth, halfL),
+        toLatLngLocal(-goalAreaWidth, halfL - goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, halfL - goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, halfL),
+      ])
+      lines.push([
+        toLatLngLocal(-goalAreaWidth, -halfL),
+        toLatLngLocal(-goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, -halfL),
+      ])
+
+      // Penalty arcs
+      const topPenaltyArc: { lat: number; lng: number }[] = []
+      const topPenaltySpotY = halfL - penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) - Math.PI / 2
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = topPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py < halfL - penaltyDepth) topPenaltyArc.push(toLatLngLocal(px, py))
+      }
+      if (topPenaltyArc.length > 1) lines.push(topPenaltyArc)
+
+      const bottomPenaltyArc: { lat: number; lng: number }[] = []
+      const bottomPenaltySpotY = -halfL + penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) + Math.PI / 2
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = bottomPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py > -halfL + penaltyDepth) bottomPenaltyArc.push(toLatLngLocal(px, py))
+      }
+      if (bottomPenaltyArc.length > 1) lines.push(bottomPenaltyArc)
+
+      // Corner arcs
+      for (const [cx, cy] of [[-halfW, halfL], [halfW, halfL], [halfW, -halfL], [-halfW, -halfL]]) {
+        const corner: { lat: number; lng: number }[] = []
+        const signX = cx > 0 ? -1 : 1
+        const signY = cy > 0 ? -1 : 1
+        for (let i = 0; i <= 9; i++) {
+          const angle = (i / 9) * (Math.PI / 2)
+          corner.push(toLatLngLocal(cx + signX * cornerArcRadius * Math.sin(angle), cy + signY * cornerArcRadius * Math.cos(angle)))
+        }
+        lines.push(corner)
+      }
+
+      return lines
     },
     []
   )
@@ -1106,17 +1191,21 @@ export default function EditorPage() {
       } else {
         // Show it
         newVisible.add(configId)
-        const path = generateConfigFieldLines(config)
+        const lines = generateConfigFieldLines(config)
         const colorHex = LINE_COLORS.find(c => c.value === config.lineColor)?.hex || '#FFFFFF'
 
-        const polyline = new google.maps.Polyline({
-          path,
-          strokeColor: colorHex,
-          strokeOpacity: 0.6,
-          strokeWeight: 2,
-          map: mapRef.current,
+        const polylines: google.maps.Polyline[] = []
+        lines.forEach(path => {
+          const polyline = new google.maps.Polyline({
+            path,
+            strokeColor: colorHex,
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+            map: mapRef.current,
+          })
+          polylines.push(polyline)
         })
-        configOverlaysRef.current.set(configId, [polyline])
+        configOverlaysRef.current.set(configId, polylines)
       }
 
       setVisibleConfigs(newVisible)
