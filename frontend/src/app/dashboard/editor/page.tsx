@@ -297,34 +297,58 @@ export default function EditorPage() {
         return { lat: center.lat + rotatedLat, lng: center.lng + rotatedLng }
       }
 
+      // Icon paths
+      const resizeIconH = 'M -8,0 L -4,0 L -4,-3 L -8,0 L -4,3 L -4,0 M 8,0 L 4,0 L 4,-3 L 8,0 L 4,3 L 4,0 M -4,0 L 4,0'
+      const rotateIcon = 'M 0,-8 A 8,8 0 1,1 -8,0 M -8,0 L -5,-3 M -8,0 L -5,3'
+
       // Update center marker
       if (dragMarkerRef.current) {
         dragMarkerRef.current.setPosition(center)
       }
 
-      // Update edge markers
-      const edgeCoords = [
-        { x: 0, y: halfL },      // top
-        { x: 0, y: -halfL },     // bottom
-        { x: -halfW, y: 0 },     // left
-        { x: halfW, y: 0 },      // right
+      // Update edge markers (position AND icon rotation)
+      const edgeData = [
+        { x: 0, y: halfL, iconRotation: 90 },      // top
+        { x: 0, y: -halfL, iconRotation: 90 },     // bottom
+        { x: -halfW, y: 0, iconRotation: 0 },      // left
+        { x: halfW, y: 0, iconRotation: 0 },       // right
       ]
       edgeMarkersRef.current.forEach((marker, idx) => {
         if (marker) {
-          marker.setPosition(toPos(edgeCoords[idx].x, edgeCoords[idx].y))
+          marker.setPosition(toPos(edgeData[idx].x, edgeData[idx].y))
+          marker.setIcon({
+            path: resizeIconH,
+            fillColor: '#3b82f6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            scale: 1,
+            anchor: new google.maps.Point(0, 0),
+            rotation: edgeData[idx].iconRotation + rot,
+          })
         }
       })
 
-      // Update corner markers
-      const cornerCoords = [
-        { x: -halfW, y: halfL },   // top-left
-        { x: halfW, y: halfL },    // top-right
-        { x: halfW, y: -halfL },   // bottom-right
-        { x: -halfW, y: -halfL },  // bottom-left
+      // Update corner markers (position AND icon rotation)
+      const cornerData = [
+        { x: -halfW, y: halfL, iconRot: 0 },     // top-left
+        { x: halfW, y: halfL, iconRot: 90 },     // top-right
+        { x: halfW, y: -halfL, iconRot: 180 },   // bottom-right
+        { x: -halfW, y: -halfL, iconRot: 270 },  // bottom-left
       ]
       cornerMarkersRef.current.forEach((marker, idx) => {
         if (marker) {
-          marker.setPosition(toPos(cornerCoords[idx].x, cornerCoords[idx].y))
+          marker.setPosition(toPos(cornerData[idx].x, cornerData[idx].y))
+          marker.setIcon({
+            path: rotateIcon,
+            fillColor: '#f59e0b',
+            fillOpacity: 0,
+            strokeColor: '#f59e0b',
+            strokeWeight: 2.5,
+            scale: 1.2,
+            anchor: new google.maps.Point(0, 0),
+            rotation: cornerData[idx].iconRot + rot,
+          })
         }
       })
     },
