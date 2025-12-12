@@ -1291,8 +1291,17 @@ export default function EditorPage() {
       setSaveError(response.error)
     } else {
       setShowSaveModal(false)
-      const savedConfig = response.data as { id: string }
-      router.push(`/dashboard/configurations/${savedConfig.id}`)
+
+      // If there's a pending edit (user clicked Save First), navigate to edit that config
+      if (pendingEditConfigId) {
+        const editId = pendingEditConfigId
+        setPendingEditConfigId(null)
+        router.push(`/dashboard/editor?sportsground=${sportsgroundId}&configuration=${editId}`)
+      } else {
+        // Normal save - go to config details
+        const savedConfig = response.data as { id: string }
+        router.push(`/dashboard/configurations/${savedConfig.id}`)
+      }
     }
 
     setIsSaving(false)
