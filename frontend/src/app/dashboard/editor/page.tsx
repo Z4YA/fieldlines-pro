@@ -279,6 +279,58 @@ export default function EditorPage() {
     [rotation]
   )
 
+  // Helper function to update all marker positions during drag
+  const updateAllMarkerPositions = useCallback(
+    (center: { lat: number; lng: number }, length: number, width: number, rot: number) => {
+      const halfL = length / 2
+      const halfW = width / 2
+
+      // Helper to convert coords with specific rotation
+      const toPos = (x: number, y: number) => {
+        const metersPerDegreeLat = 111320
+        const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+        const rotationRad = (rot * Math.PI) / 180
+        const dLat = y / metersPerDegreeLat
+        const dLng = x / metersPerDegreeLng
+        const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
+        const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
+        return { lat: center.lat + rotatedLat, lng: center.lng + rotatedLng }
+      }
+
+      // Update center marker
+      if (dragMarkerRef.current) {
+        dragMarkerRef.current.setPosition(center)
+      }
+
+      // Update edge markers
+      const edgeCoords = [
+        { x: 0, y: halfL },      // top
+        { x: 0, y: -halfL },     // bottom
+        { x: -halfW, y: 0 },     // left
+        { x: halfW, y: 0 },      // right
+      ]
+      edgeMarkersRef.current.forEach((marker, idx) => {
+        if (marker) {
+          marker.setPosition(toPos(edgeCoords[idx].x, edgeCoords[idx].y))
+        }
+      })
+
+      // Update corner markers
+      const cornerCoords = [
+        { x: -halfW, y: halfL },   // top-left
+        { x: halfW, y: halfL },    // top-right
+        { x: halfW, y: -halfL },   // bottom-right
+        { x: -halfW, y: -halfL },  // bottom-left
+      ]
+      cornerMarkersRef.current.forEach((marker, idx) => {
+        if (marker) {
+          marker.setPosition(toPos(cornerCoords[idx].x, cornerCoords[idx].y))
+        }
+      })
+    },
+    []
+  )
+
   // Helper function to redraw only the field lines (not markers) - used during drag
   const redrawFieldLines = useCallback(
     (center: { lat: number; lng: number }, length: number, width: number, rot: number, color: string) => {
@@ -759,14 +811,8 @@ export default function EditorPage() {
             // Redraw field lines with new center
             redrawFieldLines(newCenter, newLength, newWidth, rotationRef.current, colorHexForDrag)
 
-            // Update the marker position to stay on the edge
-            const newHalfL = newLength / 2
-            const newHalfW = newWidth / 2
-            const edgePos = edge.type === 'length'
-              ? { x: 0, y: edge.dir * newHalfL }
-              : { x: edge.dir * newHalfW, y: 0 }
-            const markerPos = toLatLng(newCenter, edgePos.x, edgePos.y, rotationRef.current)
-            marker.setPosition(markerPos)
+            // Update ALL marker positions (not just the dragged one)
+            updateAllMarkerPositions(newCenter, newLength, newWidth, rotationRef.current)
           }
         })
 
@@ -871,17 +917,8 @@ export default function EditorPage() {
             // Redraw field lines
             redrawFieldLines(fieldCenterRef.current, fieldLengthRef.current, fieldWidthRef.current, rotationRef.current, colorHexForDrag)
 
-            // Update marker position to stay at corner
-            const hL = fieldLengthRef.current / 2
-            const hW = fieldWidthRef.current / 2
-            const cornerCoords = [
-              { x: -hW, y: hL },
-              { x: hW, y: hL },
-              { x: hW, y: -hL },
-              { x: -hW, y: -hL },
-            ]
-            const cornerPos = toLatLng(fieldCenterRef.current, cornerCoords[idx].x, cornerCoords[idx].y, rotationRef.current)
-            marker.setPosition(cornerPos)
+            // Update ALL marker positions (not just the dragged one)
+            updateAllMarkerPositions(fieldCenterRef.current, fieldLengthRef.current, fieldWidthRef.current, rotationRef.current)
           }
         })
 
@@ -909,7 +946,7 @@ export default function EditorPage() {
         })
       })
     }
-  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate, redrawFieldLines])
+  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate, redrawFieldLines, updateAllMarkerPositions])
 
   // Handle template change
   const handleTemplateChange = (templateId: string) => {
