@@ -75,6 +75,8 @@ export default function EditorPage() {
   const edgeMarkersRef = useRef<google.maps.Marker[]>([])
   const cornerMarkersRef = useRef<google.maps.Marker[]>([])
   const isDraggingRef = useRef(false)
+  const dragStartAngleRef = useRef(0)
+  const dragStartRotationRef = useRef(0)
 
   // Refs for current values to use in event handlers
   const fieldCenterRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -904,21 +906,20 @@ export default function EditorPage() {
           title: 'Drag to rotate',
         })
 
-        // Calculate initial angle for this corner based on index
-        const getCornerAngle = (index: number, length: number, width: number) => {
-          const hL = length / 2
-          const hW = width / 2
-          const corners = [
-            { x: -hW, y: hL },
-            { x: hW, y: hL },
-            { x: hW, y: -hL },
-            { x: -hW, y: -hL },
-          ]
-          return Math.atan2(corners[index].y, corners[index].x)
-        }
-
-        marker.addListener('dragstart', () => {
+        marker.addListener('dragstart', (e: google.maps.MapMouseEvent) => {
           isDraggingRef.current = true
+          // Store the starting angle from center to mouse position
+          if (e.latLng && fieldCenterRef.current) {
+            const center = fieldCenterRef.current
+            const metersPerDegreeLat = 111320
+            const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+
+            const dx = (e.latLng.lng() - center.lng) * metersPerDegreeLng
+            const dy = (e.latLng.lat() - center.lat) * metersPerDegreeLat
+
+            dragStartAngleRef.current = Math.atan2(dy, dx)
+            dragStartRotationRef.current = rotationRef.current
+          }
         })
 
         marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
@@ -931,9 +932,12 @@ export default function EditorPage() {
             const dy = (e.latLng.lat() - center.lat) * metersPerDegreeLat
 
             const currentAngle = Math.atan2(dy, dx)
-            const initialCornerAngle = getCornerAngle(idx, fieldLengthRef.current, fieldWidthRef.current)
 
-            let newRotation = ((currentAngle - initialCornerAngle) * 180 / Math.PI)
+            // Calculate the angle delta from where we started dragging
+            const angleDelta = (currentAngle - dragStartAngleRef.current) * 180 / Math.PI
+
+            // New rotation is the starting rotation plus the angle delta
+            let newRotation = dragStartRotationRef.current + angleDelta
             newRotation = ((newRotation % 360) + 360) % 360
 
             rotationRef.current = Math.round(newRotation)
