@@ -250,7 +250,7 @@ interface ProviderNotificationData {
 }
 
 export async function sendProviderNotificationEmail(data: ProviderNotificationData) {
-  const PROVIDER_EMAIL = process.env.PROVIDER_EMAIL || 'operations@xactline.com'
+  const PROVIDER_EMAIL = process.env.PROVIDER_EMAIL || 'operations@xactline.com.au'
   const mapUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
 
   const html = `
