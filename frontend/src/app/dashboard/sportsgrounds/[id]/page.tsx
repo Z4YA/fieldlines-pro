@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapboxMap } from '@/components/map/mapbox-map'
+import { GoogleMap } from '@/components/map/google-map'
 
 interface Sportsground {
   id: string
@@ -161,13 +161,13 @@ export default function SportsgroundDetailPage() {
             <CardTitle className="text-lg">Location</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <MapboxMap
-              initialCenter={[sportsground.longitude, sportsground.latitude]}
+            <GoogleMap
+              initialCenter={{ lat: sportsground.latitude, lng: sportsground.longitude }}
               initialZoom={sportsground.defaultZoom}
-              markerPosition={[sportsground.longitude, sportsground.latitude]}
+              markerPosition={{ lat: sportsground.latitude, lng: sportsground.longitude }}
               className="h-[400px] rounded-b-lg"
               interactive={true}
-              showSatellite={true}
+              mapType="satellite"
             />
           </CardContent>
         </Card>

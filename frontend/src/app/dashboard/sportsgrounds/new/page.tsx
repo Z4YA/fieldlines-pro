@@ -8,15 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MapboxMap } from '@/components/map/mapbox-map'
+import { GoogleMap } from '@/components/map/google-map'
 import { LocationSearch } from '@/components/map/location-search'
 
 export default function NewSportsgroundPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([151.2093, -33.8688]) // Sydney default
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(null)
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: -33.8688, lng: 151.2093 }) // Sydney default
   const [mapZoom, setMapZoom] = useState(15)
 
   const [formData, setFormData] = useState({
@@ -34,24 +34,25 @@ export default function NewSportsgroundPage() {
   }) => {
     setFormData((prev) => ({
       ...prev,
-      address: result.placeName,
+      address: result.address,
       longitude: result.center[0],
       latitude: result.center[1],
     }))
-    setMarkerPosition(result.center)
-    setMapCenter(result.center)
+    const newPosition = { lat: result.center[1], lng: result.center[0] }
+    setMarkerPosition(newPosition)
+    setMapCenter(newPosition)
   }
 
-  const handleMapClick = (lngLat: { lng: number; lat: number }) => {
+  const handleMapClick = (latLng: { lat: number; lng: number }) => {
     setFormData((prev) => ({
       ...prev,
-      longitude: lngLat.lng,
-      latitude: lngLat.lat,
+      longitude: latLng.lng,
+      latitude: latLng.lat,
     }))
-    setMarkerPosition([lngLat.lng, lngLat.lat])
+    setMarkerPosition(latLng)
   }
 
-  const handleMapMove = (center: { lng: number; lat: number }, zoom: number) => {
+  const handleMapMove = (center: { lat: number; lng: number }, zoom: number) => {
     setMapZoom(zoom)
   }
 
@@ -222,14 +223,14 @@ export default function NewSportsgroundPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <MapboxMap
+              <GoogleMap
                 initialCenter={mapCenter}
                 initialZoom={mapZoom}
                 onMapClick={handleMapClick}
                 onMapMove={handleMapMove}
                 markerPosition={markerPosition}
                 className="h-[500px] rounded-b-lg"
-                showSatellite={true}
+                mapType="satellite"
               />
             </CardContent>
           </Card>

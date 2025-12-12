@@ -3,14 +3,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import mapboxgl from 'mapbox-gl'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
-import 'mapbox-gl/dist/mapbox-gl.css'
-
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
 interface Configuration {
   id: string
@@ -38,15 +33,41 @@ interface Configuration {
   }
 }
 
+// Load Google Maps script
+const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps) {
+      resolve()
+      return
+    }
+
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve())
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'))
+    document.head.appendChild(script)
+  })
+}
+
 export default function ConfigurationDetailPage() {
   const params = useParams()
   const router = useRouter()
   const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
+  const mapRef = useRef<google.maps.Map | null>(null)
 
   const [configuration, setConfiguration] = useState<Configuration | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY
 
   useEffect(() => {
     const fetchConfiguration = async () => {
@@ -64,31 +85,46 @@ export default function ConfigurationDetailPage() {
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainerRef.current || !configuration) return
+    if (!mapContainerRef.current || !configuration || !GOOGLE_API_KEY) return
 
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [configuration.longitude, configuration.latitude],
-      zoom: configuration.sportsground.defaultZoom,
-      attributionControl: false,
-    })
+    loadGoogleMapsScript(GOOGLE_API_KEY)
+      .then(() => {
+        if (!mapContainerRef.current || mapRef.current) return
 
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right')
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
+        const map = new google.maps.Map(mapContainerRef.current, {
+          center: { lat: configuration.latitude, lng: configuration.longitude },
+          zoom: configuration.sportsground.defaultZoom,
+          mapTypeId: 'satellite',
+          tilt: 0,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: true,
+          streetViewControl: false,
+          fullscreenControl: true,
+        })
 
-    // Add marker at field center
-    new mapboxgl.Marker({ color: '#22c55e' })
-      .setLngLat([configuration.longitude, configuration.latitude])
-      .addTo(map)
+        // Add marker at field center
+        new google.maps.Marker({
+          position: { lat: configuration.latitude, lng: configuration.longitude },
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#22c55e',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+        })
 
-    mapRef.current = map
+        mapRef.current = map
+      })
+      .catch(console.error)
 
     return () => {
-      map.remove()
       mapRef.current = null
     }
-  }, [configuration])
+  }, [configuration, GOOGLE_API_KEY])
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this configuration?')) {
