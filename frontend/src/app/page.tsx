@@ -46,7 +46,7 @@ export default function Home() {
       <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
-            How FieldLines Pro Works
+            How XACTLINE Works
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-xl shadow-sm">
@@ -93,7 +93,7 @@ export default function Home() {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
-            Join sports clubs, schools, and councils already using FieldLines Pro to manage their field markings.
+            Join sports clubs, schools, and councils already using XACTLINE to manage their field markings.
           </p>
           <Link
             href="/register"
@@ -109,7 +109,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <span className="text-white font-bold text-xl">FieldLines Pro</span>
+              <span className="text-white font-bold text-xl">XACTLINE</span>
             </div>
             <div className="flex gap-6">
               <Link href="/about" className="hover:text-white transition-colors">About</Link>
@@ -119,7 +119,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-sm">
-            &copy; {new Date().getFullYear()} FieldLines Pro. All rights reserved.
+            &copy; {new Date().getFullYear()} XACTLINE. All rights reserved.
           </div>
         </div>
       </footer>

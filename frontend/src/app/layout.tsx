@@ -6,7 +6,7 @@ import { Providers } from '@/components/providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'FieldLines Pro - Sports Field Line Marking Platform',
+  title: 'XACTLINE - Sports Field Line Marking Platform',
   description: 'Design, visualize, and request professional line marking services for your sportsgrounds',
 }
 

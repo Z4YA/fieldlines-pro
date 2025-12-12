@@ -1,6 +1,6 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.EMAIL_FROM || 'onboarding@resend.dev'
-const FROM_NAME = process.env.FROM_NAME || 'FieldLines Pro'
+const FROM_NAME = process.env.FROM_NAME || 'XACTLINE'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:9500'
 
 // Send email using Resend API
@@ -53,18 +53,18 @@ export async function sendVerificationEmail(email: string, token: string) {
     <body>
       <div class="container">
         <div class="header">
-          <h1>FieldLines Pro</h1>
+          <h1>XACTLINE</h1>
         </div>
         <div class="content">
           <h2>Verify Your Email</h2>
-          <p>Thank you for registering with FieldLines Pro. Please click the button below to verify your email address:</p>
+          <p>Thank you for registering with XACTLINE. Please click the button below to verify your email address:</p>
           <a href="${verifyUrl}" class="button">Verify Email</a>
           <p>If the button doesn't work, copy and paste this link into your browser:</p>
           <p>${verifyUrl}</p>
           <p>This link will expire in 24 hours.</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} FieldLines Pro. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} XACTLINE. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -72,7 +72,7 @@ export async function sendVerificationEmail(email: string, token: string) {
   `
 
   try {
-    await sendEmail(email, 'Verify your FieldLines Pro account', html)
+    await sendEmail(email, 'Verify your XACTLINE account', html)
     console.log(`Verification email sent to ${email}`)
   } catch (error) {
     console.error('Failed to send verification email:', error)
@@ -99,7 +99,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
     <body>
       <div class="container">
         <div class="header">
-          <h1>FieldLines Pro</h1>
+          <h1>XACTLINE</h1>
         </div>
         <div class="content">
           <h2>Reset Your Password</h2>
@@ -111,7 +111,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
           <p>If you didn't request this password reset, please ignore this email.</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} FieldLines Pro. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} XACTLINE. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -119,7 +119,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   `
 
   try {
-    await sendEmail(email, 'Reset your FieldLines Pro password', html)
+    await sendEmail(email, 'Reset your XACTLINE password', html)
     console.log(`Password reset email sent to ${email}`)
   } catch (error) {
     console.error('Failed to send password reset email:', error)
@@ -159,7 +159,7 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
     <body>
       <div class="container">
         <div class="header">
-          <h1>FieldLines Pro</h1>
+          <h1>XACTLINE</h1>
         </div>
         <div class="content">
           <h2>Booking Request Received</h2>
@@ -213,7 +213,7 @@ export async function sendBookingConfirmationEmail(data: BookingConfirmationData
           <p>If you have any questions, please don't hesitate to contact us.</p>
         </div>
         <div class="footer">
-          <p>&copy; ${new Date().getFullYear()} FieldLines Pro. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} XACTLINE. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -250,7 +250,7 @@ interface ProviderNotificationData {
 }
 
 export async function sendProviderNotificationEmail(data: ProviderNotificationData) {
-  const PROVIDER_EMAIL = process.env.PROVIDER_EMAIL || 'operations@fieldlinespro.com'
+  const PROVIDER_EMAIL = process.env.PROVIDER_EMAIL || 'operations@xactline.com'
   const mapUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
 
   const html = `

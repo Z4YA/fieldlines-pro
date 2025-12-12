@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <Link href="/" className="text-2xl font-bold text-green-600">
-              FieldLines Pro
+              XACTLINE
             </Link>
           </div>
           <CardTitle className="text-2xl text-center">Forgot your password?</CardTitle>

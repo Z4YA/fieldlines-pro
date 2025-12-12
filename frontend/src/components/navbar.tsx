@@ -24,7 +24,7 @@ export function Navbar() {
           {/* Logo and main nav */}
           <div className="flex">
             <Link href="/dashboard" className="flex items-center">
-              <span className="text-xl font-bold text-green-600">FieldLines Pro</span>
+              <span className="text-xl font-bold text-green-600">XACTLINE</span>
             </Link>
             <div className="hidden md:ml-10 md:flex md:space-x-8">
               <Link

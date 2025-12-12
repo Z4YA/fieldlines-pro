@@ -93,7 +93,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-center text-gray-600">
             <p>
-              Click the link in the email to verify your account and get started with FieldLines Pro.
+              Click the link in the email to verify your account and get started with XACTLINE.
             </p>
             <p className="text-sm">
               Didn&apos;t receive the email? Check your spam folder or{' '}
@@ -122,7 +122,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <Link href="/" className="text-2xl font-bold text-green-600">
-              FieldLines Pro
+              XACTLINE
             </Link>
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>

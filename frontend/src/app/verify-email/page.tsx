@@ -113,7 +113,7 @@ function VerifyEmailContent() {
         </CardHeader>
         <CardContent className="text-center text-gray-600">
           <p>
-            Welcome to FieldLines Pro! You&apos;re all set to start designing and booking field line markings.
+            Welcome to XACTLINE! You&apos;re all set to start designing and booking field line markings.
           </p>
         </CardContent>
         <CardFooter>

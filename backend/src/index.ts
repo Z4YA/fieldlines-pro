@@ -51,7 +51,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 })
 
 app.listen(PORT, () => {
-  console.log(`FieldLines Pro API server running on port ${PORT}`)
+  console.log(`XACTLINE API server running on port ${PORT}`)
 })
 
 export default app
