@@ -74,12 +74,14 @@ export default function EditorPage() {
   const dragMarkerRef = useRef<google.maps.Marker | null>(null)
   const edgeMarkersRef = useRef<google.maps.Marker[]>([])
   const cornerMarkersRef = useRef<google.maps.Marker[]>([])
+  const isDraggingRef = useRef(false)
 
   // Refs for current values to use in event handlers
   const fieldCenterRef = useRef<{ lat: number; lng: number } | null>(null)
   const fieldLengthRef = useRef(100)
   const fieldWidthRef = useRef(64)
   const rotationRef = useRef(0)
+  const selectedTemplateRef = useRef<FieldTemplate | null>(null)
 
   const [sportsground, setSportsground] = useState<Sportsground | null>(null)
   const [templates, setTemplates] = useState<FieldTemplate[]>([])
@@ -117,6 +119,10 @@ export default function EditorPage() {
   useEffect(() => {
     rotationRef.current = rotation
   }, [rotation])
+
+  useEffect(() => {
+    selectedTemplateRef.current = selectedTemplate
+  }, [selectedTemplate])
 
   // Load data
   useEffect(() => {
@@ -271,6 +277,139 @@ export default function EditorPage() {
       return { x, y }
     },
     [rotation]
+  )
+
+  // Helper function to redraw only the field lines (not markers) - used during drag
+  const redrawFieldLines = useCallback(
+    (center: { lat: number; lng: number }, length: number, width: number, rot: number, color: string) => {
+      if (!mapRef.current) return
+
+      // Clear existing polylines
+      fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
+      fieldOverlaysRef.current = []
+
+      const L = length
+      const W = width
+      const halfL = L / 2
+      const halfW = W / 2
+
+      // Helper with explicit rotation
+      const toLatLngLocal = (x: number, y: number) => {
+        const metersPerDegreeLat = 111320
+        const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+        const rotationRad = (rot * Math.PI) / 180
+        const dLat = y / metersPerDegreeLat
+        const dLng = x / metersPerDegreeLng
+        const rotatedLat = dLat * Math.cos(rotationRad) - dLng * Math.sin(rotationRad)
+        const rotatedLng = dLat * Math.sin(rotationRad) + dLng * Math.cos(rotationRad)
+        return { lat: center.lat + rotatedLat, lng: center.lng + rotatedLng }
+      }
+
+      const penaltyDepth = 16.5
+      const penaltyWidth = 40.3 / 2
+      const goalAreaDepth = 5.5
+      const goalAreaWidth = 18.3 / 2
+      const centerCircleRadius = 9.15
+      const penaltySpotDist = 11
+      const penaltyArcRadius = 9.15
+      const cornerArcRadius = 1
+
+      const lines: { lat: number; lng: number }[][] = []
+
+      // Outer boundary
+      lines.push([
+        toLatLngLocal(-halfW, -halfL),
+        toLatLngLocal(halfW, -halfL),
+        toLatLngLocal(halfW, halfL),
+        toLatLngLocal(-halfW, halfL),
+        toLatLngLocal(-halfW, -halfL),
+      ])
+
+      // Center line
+      lines.push([toLatLngLocal(-halfW, 0), toLatLngLocal(halfW, 0)])
+
+      // Center circle
+      const centerCircle: { lat: number; lng: number }[] = []
+      for (let i = 0; i <= 36; i++) {
+        const angle = (i / 36) * 2 * Math.PI
+        centerCircle.push(toLatLngLocal(centerCircleRadius * Math.cos(angle), centerCircleRadius * Math.sin(angle)))
+      }
+      lines.push(centerCircle)
+
+      // Penalty areas
+      lines.push([
+        toLatLngLocal(-penaltyWidth, halfL),
+        toLatLngLocal(-penaltyWidth, halfL - penaltyDepth),
+        toLatLngLocal(penaltyWidth, halfL - penaltyDepth),
+        toLatLngLocal(penaltyWidth, halfL),
+      ])
+      lines.push([
+        toLatLngLocal(-penaltyWidth, -halfL),
+        toLatLngLocal(-penaltyWidth, -halfL + penaltyDepth),
+        toLatLngLocal(penaltyWidth, -halfL + penaltyDepth),
+        toLatLngLocal(penaltyWidth, -halfL),
+      ])
+
+      // Goal areas
+      lines.push([
+        toLatLngLocal(-goalAreaWidth, halfL),
+        toLatLngLocal(-goalAreaWidth, halfL - goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, halfL - goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, halfL),
+      ])
+      lines.push([
+        toLatLngLocal(-goalAreaWidth, -halfL),
+        toLatLngLocal(-goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, -halfL + goalAreaDepth),
+        toLatLngLocal(goalAreaWidth, -halfL),
+      ])
+
+      // Penalty arcs
+      const topPenaltyArc: { lat: number; lng: number }[] = []
+      const topPenaltySpotY = halfL - penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) - Math.PI / 2
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = topPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py < halfL - penaltyDepth) topPenaltyArc.push(toLatLngLocal(px, py))
+      }
+      if (topPenaltyArc.length > 1) lines.push(topPenaltyArc)
+
+      const bottomPenaltyArc: { lat: number; lng: number }[] = []
+      const bottomPenaltySpotY = -halfL + penaltySpotDist
+      for (let i = -10; i <= 10; i++) {
+        const angle = (i / 10) * (Math.PI / 3) + Math.PI / 2
+        const px = penaltyArcRadius * Math.cos(angle)
+        const py = bottomPenaltySpotY + penaltyArcRadius * Math.sin(angle)
+        if (py > -halfL + penaltyDepth) bottomPenaltyArc.push(toLatLngLocal(px, py))
+      }
+      if (bottomPenaltyArc.length > 1) lines.push(bottomPenaltyArc)
+
+      // Corner arcs
+      for (const [cx, cy] of [[-halfW, halfL], [halfW, halfL], [halfW, -halfL], [-halfW, -halfL]]) {
+        const corner: { lat: number; lng: number }[] = []
+        const signX = cx > 0 ? -1 : 1
+        const signY = cy > 0 ? -1 : 1
+        for (let i = 0; i <= 9; i++) {
+          const angle = (i / 9) * (Math.PI / 2)
+          corner.push(toLatLngLocal(cx + signX * cornerArcRadius * Math.sin(angle), cy + signY * cornerArcRadius * Math.cos(angle)))
+        }
+        lines.push(corner)
+      }
+
+      // Create polylines
+      lines.forEach((linePath) => {
+        const polyline = new google.maps.Polyline({
+          path: linePath,
+          strokeColor: color,
+          strokeOpacity: 1,
+          strokeWeight: 2,
+          map: mapRef.current,
+        })
+        fieldOverlaysRef.current.push(polyline)
+      })
+    },
+    []
   )
 
   // Generate soccer field lines
@@ -491,26 +630,98 @@ export default function EditorPage() {
     // Edge markers for resizing (midpoints of each edge)
     const halfL = fieldLength / 2
     const halfW = fieldWidth / 2
+    const colorHexForDrag = colorHex
 
     // Positions: top, bottom, left, right (in local coords)
     const edgePositions = [
-      { x: 0, y: halfL, type: 'length', dir: 1 },      // top (increase length)
-      { x: 0, y: -halfL, type: 'length', dir: -1 },    // bottom (decrease length when dragged down)
-      { x: -halfW, y: 0, type: 'width', dir: -1 },     // left (decrease width)
-      { x: halfW, y: 0, type: 'width', dir: 1 },       // right (increase width)
+      { x: 0, y: halfL, type: 'length' as const, dir: 1 },
+      { x: 0, y: -halfL, type: 'length' as const, dir: -1 },
+      { x: -halfW, y: 0, type: 'width' as const, dir: -1 },
+      { x: halfW, y: 0, type: 'width' as const, dir: 1 },
     ]
 
-    // Clear existing edge markers
-    edgeMarkersRef.current.forEach(m => m.setMap(null))
-    edgeMarkersRef.current = []
+    // Only recreate edge markers if they don't exist or count changed
+    if (edgeMarkersRef.current.length !== 4) {
+      edgeMarkersRef.current.forEach(m => m.setMap(null))
+      edgeMarkersRef.current = []
 
-    edgePositions.forEach((edge) => {
-      const pos = toLatLng(fieldCenter, edge.x, edge.y)
-      const marker = new google.maps.Marker({
-        position: pos,
-        map: mapRef.current,
-        draggable: true,
-        icon: {
+      edgePositions.forEach((edge, idx) => {
+        const pos = toLatLng(fieldCenter, edge.x, edge.y)
+        const marker = new google.maps.Marker({
+          position: pos,
+          map: mapRef.current,
+          draggable: true,
+          icon: {
+            path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+            scale: 5,
+            fillColor: '#3b82f6',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            rotation: edge.type === 'length' ? (rotation + (edge.dir === 1 ? 0 : 180)) : (rotation + (edge.dir === 1 ? 90 : 270)),
+          },
+          title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
+        })
+
+        marker.addListener('dragstart', () => {
+          isDraggingRef.current = true
+        })
+
+        marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
+          if (e.latLng && fieldCenterRef.current) {
+            const metersPerDegreeLat = 111320
+            const metersPerDegreeLng = 111320 * Math.cos((fieldCenterRef.current.lat * Math.PI) / 180)
+            const rotationRad = (rotationRef.current * Math.PI) / 180
+
+            const dLat = e.latLng.lat() - fieldCenterRef.current.lat
+            const dLng = e.latLng.lng() - fieldCenterRef.current.lng
+
+            const unrotatedLat = dLat * Math.cos(-rotationRad) - dLng * Math.sin(-rotationRad)
+            const unrotatedLng = dLat * Math.sin(-rotationRad) + dLng * Math.cos(-rotationRad)
+
+            const localY = unrotatedLat * metersPerDegreeLat
+            const localX = unrotatedLng * metersPerDegreeLng
+
+            let newLength = fieldLengthRef.current
+            let newWidth = fieldWidthRef.current
+            const template = selectedTemplateRef.current
+
+            if (edge.type === 'length') {
+              const newHalfLength = Math.abs(localY)
+              newLength = Math.round(newHalfLength * 2)
+              if (template) {
+                newLength = Math.min(Math.max(newLength, template.minLength), template.maxLength)
+              }
+              fieldLengthRef.current = newLength
+            } else {
+              const newHalfWidth = Math.abs(localX)
+              newWidth = Math.round(newHalfWidth * 2)
+              if (template) {
+                newWidth = Math.min(Math.max(newWidth, template.minWidth), template.maxWidth)
+              }
+              fieldWidthRef.current = newWidth
+            }
+
+            // Redraw field lines only
+            redrawFieldLines(fieldCenterRef.current, newLength, newWidth, rotationRef.current, colorHexForDrag)
+          }
+        })
+
+        marker.addListener('dragend', () => {
+          isDraggingRef.current = false
+          // Commit the final values to state
+          setFieldLength(fieldLengthRef.current)
+          setFieldWidth(fieldWidthRef.current)
+        })
+
+        edgeMarkersRef.current.push(marker)
+      })
+    } else {
+      // Update existing marker positions
+      edgePositions.forEach((edge, idx) => {
+        const pos = toLatLng(fieldCenter, edge.x, edge.y)
+        edgeMarkersRef.current[idx].setPosition(pos)
+        edgeMarkersRef.current[idx].setIcon({
           path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
           scale: 5,
           fillColor: '#3b82f6',
@@ -518,100 +729,96 @@ export default function EditorPage() {
           strokeColor: '#ffffff',
           strokeWeight: 2,
           rotation: edge.type === 'length' ? (rotation + (edge.dir === 1 ? 0 : 180)) : (rotation + (edge.dir === 1 ? 90 : 270)),
-        },
-        title: edge.type === 'length' ? 'Drag to resize length' : 'Drag to resize width',
-        cursor: 'ns-resize',
+        })
       })
-
-      marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-        if (e.latLng && fieldCenterRef.current) {
-          const localCoords = fromLatLng(fieldCenterRef.current, { lat: e.latLng.lat(), lng: e.latLng.lng() })
-
-          if (edge.type === 'length') {
-            // Distance from center along the length axis
-            const newHalfLength = Math.abs(localCoords.y)
-            const newLength = Math.round(newHalfLength * 2)
-            if (newLength >= (selectedTemplate?.minLength || 45) && newLength <= (selectedTemplate?.maxLength || 120)) {
-              setFieldLength(newLength)
-            }
-          } else {
-            // Distance from center along the width axis
-            const newHalfWidth = Math.abs(localCoords.x)
-            const newWidth = Math.round(newHalfWidth * 2)
-            if (newWidth >= (selectedTemplate?.minWidth || 45) && newWidth <= (selectedTemplate?.maxWidth || 90)) {
-              setFieldWidth(newWidth)
-            }
-          }
-        }
-      })
-
-      edgeMarkersRef.current.push(marker)
-    })
+    }
 
     // Corner markers for rotation
     const cornerPositions = [
-      { x: -halfW, y: halfL },   // top-left
-      { x: halfW, y: halfL },    // top-right
-      { x: halfW, y: -halfL },   // bottom-right
-      { x: -halfW, y: -halfL },  // bottom-left
+      { x: -halfW, y: halfL },
+      { x: halfW, y: halfL },
+      { x: halfW, y: -halfL },
+      { x: -halfW, y: -halfL },
     ]
 
-    // Clear existing corner markers
-    cornerMarkersRef.current.forEach(m => m.setMap(null))
-    cornerMarkersRef.current = []
+    // Only recreate corner markers if they don't exist
+    if (cornerMarkersRef.current.length !== 4) {
+      cornerMarkersRef.current.forEach(m => m.setMap(null))
+      cornerMarkersRef.current = []
 
-    cornerPositions.forEach((corner, index) => {
-      const pos = toLatLng(fieldCenter, corner.x, corner.y)
-      const marker = new google.maps.Marker({
-        position: pos,
-        map: mapRef.current,
-        draggable: true,
-        icon: {
-          path: 'M -6,-6 L 6,-6 L 6,6 L -6,6 Z M -3,-3 L 3,-3 L 3,3 L -3,3 Z',
-          fillColor: '#f59e0b',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 1,
-          scale: 1,
-          anchor: new google.maps.Point(0, 0),
-        },
-        title: 'Drag to rotate',
-        cursor: 'crosshair',
-      })
+      cornerPositions.forEach((corner, idx) => {
+        const pos = toLatLng(fieldCenter, corner.x, corner.y)
+        const marker = new google.maps.Marker({
+          position: pos,
+          map: mapRef.current,
+          draggable: true,
+          icon: {
+            path: 'M -6,-6 L 6,-6 L 6,6 L -6,6 Z M -3,-3 L 3,-3 L 3,3 L -3,3 Z',
+            fillColor: '#f59e0b',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 1,
+            scale: 1,
+            anchor: new google.maps.Point(0, 0),
+          },
+          title: 'Drag to rotate',
+        })
 
-      // Store initial angle for this corner
-      const initialCornerAngle = Math.atan2(corner.y, corner.x)
-
-      marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-        if (e.latLng && fieldCenterRef.current) {
-          const center = fieldCenterRef.current
-
-          // Calculate angle from center to dragged position
-          const metersPerDegreeLat = 111320
-          const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
-
-          const dx = (e.latLng.lng() - center.lng) * metersPerDegreeLng
-          const dy = (e.latLng.lat() - center.lat) * metersPerDegreeLat
-
-          // Current angle from center
-          const currentAngle = Math.atan2(dy, dx)
-
-          // The rotation is the difference between where the corner should be and where it is
-          // We need to figure out what rotation would put the corner at this angle
-          // Corner at angle = initialCornerAngle + rotation
-          // So: rotation = currentAngle - initialCornerAngle
-          let newRotation = ((currentAngle - initialCornerAngle) * 180 / Math.PI)
-
-          // Normalize to 0-360
-          newRotation = ((newRotation % 360) + 360) % 360
-
-          setRotation(Math.round(newRotation))
+        // Calculate initial angle for this corner based on index
+        // Corners are: TL, TR, BR, BL
+        const getCornerAngle = (index: number, length: number, width: number) => {
+          const hL = length / 2
+          const hW = width / 2
+          const corners = [
+            { x: -hW, y: hL },
+            { x: hW, y: hL },
+            { x: hW, y: -hL },
+            { x: -hW, y: -hL },
+          ]
+          return Math.atan2(corners[index].y, corners[index].x)
         }
-      })
 
-      cornerMarkersRef.current.push(marker)
-    })
-  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate])
+        marker.addListener('dragstart', () => {
+          isDraggingRef.current = true
+        })
+
+        marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
+          if (e.latLng && fieldCenterRef.current) {
+            const center = fieldCenterRef.current
+            const metersPerDegreeLat = 111320
+            const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+
+            const dx = (e.latLng.lng() - center.lng) * metersPerDegreeLng
+            const dy = (e.latLng.lat() - center.lat) * metersPerDegreeLat
+
+            const currentAngle = Math.atan2(dy, dx)
+            const initialCornerAngle = getCornerAngle(idx, fieldLengthRef.current, fieldWidthRef.current)
+
+            let newRotation = ((currentAngle - initialCornerAngle) * 180 / Math.PI)
+            newRotation = ((newRotation % 360) + 360) % 360
+
+            rotationRef.current = Math.round(newRotation)
+
+            // Redraw field lines only
+            redrawFieldLines(fieldCenterRef.current, fieldLengthRef.current, fieldWidthRef.current, rotationRef.current, colorHexForDrag)
+          }
+        })
+
+        marker.addListener('dragend', () => {
+          isDraggingRef.current = false
+          setRotation(rotationRef.current)
+        })
+
+        cornerMarkersRef.current.push(marker)
+      })
+    } else {
+      // Update existing marker positions
+      cornerPositions.forEach((corner, idx) => {
+        const pos = toLatLng(fieldCenter, corner.x, corner.y)
+        cornerMarkersRef.current[idx].setPosition(pos)
+      })
+    }
+  }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate, redrawFieldLines])
 
   // Handle template change
   const handleTemplateChange = (templateId: string) => {
