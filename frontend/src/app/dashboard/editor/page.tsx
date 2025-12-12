@@ -183,13 +183,17 @@ export default function EditorPage() {
             longitude: number
             name: string
           }
-          setFieldLength(config.lengthMeters)
-          setFieldWidth(config.widthMeters)
-          setLineColor(config.lineColor)
-          setRotation(config.rotationDegrees)
-          setFieldCenter({ lat: config.latitude, lng: config.longitude })
-          setFieldPlaced(true)
-          setConfigName(config.name)
+          setFieldLength(config.lengthMeters || selectedTemplate?.defaultLength || 100)
+          setFieldWidth(config.widthMeters || selectedTemplate?.defaultWidth || 64)
+          setLineColor(config.lineColor || 'white')
+          setRotation(config.rotationDegrees || 0)
+          setConfigName(config.name || '')
+
+          // Only set field as placed if we have valid coordinates
+          if (config.latitude && config.longitude) {
+            setFieldCenter({ lat: config.latitude, lng: config.longitude })
+            setFieldPlaced(true)
+          }
         }
       }
 
@@ -1251,8 +1255,13 @@ export default function EditorPage() {
       return
     }
 
-    if (!sportsgroundId || !fieldCenter || !selectedTemplate) {
-      setSaveError('Missing required data')
+    if (!fieldCenter) {
+      setSaveError('Please place a field on the map first')
+      return
+    }
+
+    if (!sportsgroundId || !selectedTemplate) {
+      setSaveError('Missing required data - please select a sportsground and template')
       return
     }
 
