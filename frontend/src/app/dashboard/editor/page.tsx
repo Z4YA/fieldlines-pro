@@ -302,8 +302,8 @@ export default function EditorPage() {
         return { lat: center.lat + dLat, lng: center.lng + dLng }
       }
 
-      // Icon paths
-      const resizeIconH = 'M -8,0 L -4,0 L -4,-3 L -8,0 L -4,3 L -4,0 M 8,0 L 4,0 L 4,-3 L 8,0 L 4,3 L 4,0 M -4,0 L 4,0'
+      // Icon paths - includes filled rectangle for hit area
+      const resizeIconH = 'M -10,-5 L 10,-5 L 10,5 L -10,5 Z M -10,0 L -6,0 L -6,-4 L -12,0 L -6,4 L -6,0 M 10,0 L 6,0 L 6,-4 L 12,0 L 6,4 L 6,0'
       const rotateIcon = 'M 0,-8 A 8,8 0 1,1 -8,0 M -8,0 L -5,-3 M -8,0 L -5,3'
 
       // Update center marker
@@ -329,10 +329,10 @@ export default function EditorPage() {
           marker.setIcon({
             path: resizeIconH,
             fillColor: '#3b82f6',
-            fillOpacity: 1,
+            fillOpacity: 0.8,
             strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 1,
+            strokeWeight: 1.5,
+            scale: 1.2,
             anchor: new google.maps.Point(0, 0),
             rotation: edgeData[idx].baseIconRotation - rot,
           })
@@ -724,8 +724,8 @@ export default function EditorPage() {
     const colorHexForDrag = colorHex
 
     // Standard resize icon path (two arrows pointing outward with a line)
-    // Horizontal resize icon ↔
-    const resizeIconH = 'M -8,0 L -4,0 L -4,-3 L -8,0 L -4,3 L -4,0 M 8,0 L 4,0 L 4,-3 L 8,0 L 4,3 L 4,0 M -4,0 L 4,0'
+    // Horizontal resize icon ↔ - includes a filled rectangle for hit area
+    const resizeIconH = 'M -10,-5 L 10,-5 L 10,5 L -10,5 Z M -10,0 L -6,0 L -6,-4 L -12,0 L -6,4 L -6,0 M 10,0 L 6,0 L 6,-4 L 12,0 L 6,4 L 6,0'
     // Vertical resize icon (same but rotated via the rotation property)
 
     // Positions: top, bottom, left, right (in local coords)
@@ -754,10 +754,10 @@ export default function EditorPage() {
           icon: {
             path: resizeIconH,
             fillColor: '#3b82f6',
-            fillOpacity: 1,
+            fillOpacity: 0.8,
             strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 1,
+            strokeWeight: 1.5,
+            scale: 1.2,
             anchor: new google.maps.Point(0, 0),
             rotation: edge.baseIconRotation - rotation,
           },
@@ -878,10 +878,10 @@ export default function EditorPage() {
         edgeMarkersRef.current[idx].setIcon({
           path: resizeIconH,
           fillColor: '#3b82f6',
-          fillOpacity: 1,
+          fillOpacity: 0.8,
           strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 1,
+          strokeWeight: 1.5,
+          scale: 1.2,
           anchor: new google.maps.Point(0, 0),
           rotation: edge.baseIconRotation - rotation,
         })
