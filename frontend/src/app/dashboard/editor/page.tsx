@@ -147,6 +147,23 @@ export default function EditorPage() {
     const loadData = async () => {
       setIsLoading(true)
 
+      // Reset field state when loading new data
+      setFieldPlaced(false)
+      setFieldCenter(null)
+      setConfigName('')
+
+      // Clear existing overlays and markers
+      fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
+      fieldOverlaysRef.current = []
+      if (dragMarkerRef.current) {
+        dragMarkerRef.current.setMap(null)
+        dragMarkerRef.current = null
+      }
+      edgeMarkersRef.current.forEach(m => m.setMap(null))
+      edgeMarkersRef.current = []
+      cornerMarkersRef.current.forEach(m => m.setMap(null))
+      cornerMarkersRef.current = []
+
       const templatesResponse = await api.getTemplates()
       if (templatesResponse.data) {
         setTemplates(templatesResponse.data)
@@ -183,8 +200,8 @@ export default function EditorPage() {
             longitude: number
             name: string
           }
-          setFieldLength(config.lengthMeters || selectedTemplate?.defaultLength || 100)
-          setFieldWidth(config.widthMeters || selectedTemplate?.defaultWidth || 64)
+          setFieldLength(config.lengthMeters || 100)
+          setFieldWidth(config.widthMeters || 64)
           setLineColor(config.lineColor || 'white')
           setRotation(config.rotationDegrees || 0)
           setConfigName(config.name || '')
@@ -193,8 +210,17 @@ export default function EditorPage() {
           if (config.latitude && config.longitude) {
             setFieldCenter({ lat: config.latitude, lng: config.longitude })
             setFieldPlaced(true)
+
+            // Pan map to the configuration location
+            if (mapRef.current) {
+              mapRef.current.panTo({ lat: config.latitude, lng: config.longitude })
+            }
           }
         }
+      } else {
+        // No configuration - reset to defaults
+        setRotation(0)
+        setLineColor('white')
       }
 
       setIsLoading(false)
@@ -1333,7 +1359,15 @@ export default function EditorPage() {
           </Link>
           {sportsground && (
             <div>
-              <h1 className="font-semibold text-gray-900">{sportsground.name}</h1>
+              <h1 className="font-semibold text-gray-900">
+                {sportsground.name}
+                {configurationId && configName && (
+                  <span className="text-green-600 ml-2">— Editing: {configName}</span>
+                )}
+                {!configurationId && (
+                  <span className="text-blue-600 ml-2">— New Configuration</span>
+                )}
+              </h1>
               <p className="text-xs text-gray-500">{sportsground.address}</p>
             </div>
           )}
