@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -27,11 +27,18 @@ interface Configuration {
   }
 }
 
+type SortField = 'name' | 'sportsground' | 'template' | 'dimensions' | 'lineColor' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function ConfigurationsPage() {
   const [configurations, setConfigurations] = useState<Configuration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [filter, setFilter] = useState<string>('')
+  const [searchFilter, setSearchFilter] = useState('')
+  const [sportsgroundFilter, setSportsgroundFilter] = useState<string>('')
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchConfigurations = async () => {
     const response = await api.getConfigurations()
@@ -60,15 +67,97 @@ export default function ConfigurationsPage() {
     setDeleteId(null)
   }
 
-  const filteredConfigurations = configurations.filter((config) => {
-    if (!filter) return true
-    const searchLower = filter.toLowerCase()
-    return (
-      config.name.toLowerCase().includes(searchLower) ||
-      config.sportsground.name.toLowerCase().includes(searchLower) ||
-      config.template.name.toLowerCase().includes(searchLower)
+  // Get unique sportsgrounds for filter dropdown
+  const sportsgrounds = useMemo(() => {
+    const uniqueSportsgrounds = new Map<string, { id: string; name: string }>()
+    configurations.forEach((config) => {
+      if (!uniqueSportsgrounds.has(config.sportsground.id)) {
+        uniqueSportsgrounds.set(config.sportsground.id, {
+          id: config.sportsground.id,
+          name: config.sportsground.name,
+        })
+      }
+    })
+    return Array.from(uniqueSportsgrounds.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [configurations])
+
+  // Filter and sort configurations
+  const filteredAndSortedConfigurations = useMemo(() => {
+    const filtered = configurations.filter((config) => {
+      // Search filter
+      if (searchFilter) {
+        const searchLower = searchFilter.toLowerCase()
+        const matchesSearch =
+          config.name.toLowerCase().includes(searchLower) ||
+          config.sportsground.name.toLowerCase().includes(searchLower) ||
+          config.template.name.toLowerCase().includes(searchLower)
+        if (!matchesSearch) return false
+      }
+
+      // Sportsground filter
+      if (sportsgroundFilter && config.sportsground.id !== sportsgroundFilter) {
+        return false
+      }
+
+      return true
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'sportsground':
+          comparison = a.sportsground.name.localeCompare(b.sportsground.name)
+          break
+        case 'template':
+          comparison = a.template.name.localeCompare(b.template.name)
+          break
+        case 'dimensions':
+          comparison = (a.lengthMeters * a.widthMeters) - (b.lengthMeters * b.widthMeters)
+          break
+        case 'lineColor':
+          comparison = a.lineColor.localeCompare(b.lineColor)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return filtered
+  }, [configurations, searchFilter, sportsgroundFilter, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
     )
-  })
+  }
 
   const getColorHex = (color: string): string => {
     const colorMap: Record<string, string> = {
@@ -84,27 +173,67 @@ export default function ConfigurationsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Field Configurations</h1>
           <p className="text-gray-600 mt-1">Manage your saved field designs</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <Link href="/dashboard/sportsgrounds">
+          <Button>
+            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Design
+          </Button>
+        </Link>
+      </div>
+
+      {/* Filters and View Toggle */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1 flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             placeholder="Search configurations..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 w-64"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 flex-1 sm:max-w-xs"
           />
-          <Link href="/dashboard/sportsgrounds">
-            <Button>
-              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Design
-            </Button>
-          </Link>
+          <select
+            value={sportsgroundFilter}
+            onChange={(e) => setSportsgroundFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+          >
+            <option value="">All Sportsgrounds</option>
+            {sportsgrounds.map((sg) => (
+              <option key={sg.id} value={sg.id}>
+                {sg.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`px-3 py-2 flex items-center gap-1 ${
+              viewMode === 'cards' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Card View"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-2 flex items-center gap-1 ${
+              viewMode === 'table' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Table View"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -144,16 +273,138 @@ export default function ConfigurationsPage() {
             </Link>
           </CardContent>
         </Card>
-      ) : filteredConfigurations.length === 0 ? (
+      ) : filteredAndSortedConfigurations.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No matching configurations</h3>
-            <p className="text-gray-500">Try a different search term.</p>
+            <p className="text-gray-500">Try adjusting your filters.</p>
           </CardContent>
         </Card>
+      ) : viewMode === 'table' ? (
+        /* Table View */
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Name
+                      <SortIcon field="name" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('sportsground')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Sportsground
+                      <SortIcon field="sportsground" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('template')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Template
+                      <SortIcon field="template" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('dimensions')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Dimensions
+                      <SortIcon field="dimensions" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('lineColor')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Color
+                      <SortIcon field="lineColor" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('createdAt')}
+                      className="flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      Created
+                      <SortIcon field="createdAt" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredAndSortedConfigurations.map((config) => (
+                  <tr key={config.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/dashboard/configurations/${config.id}`}
+                        className="font-medium text-gray-900 hover:text-green-600"
+                      >
+                        {config.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{config.sportsground.name}</td>
+                    <td className="px-4 py-3 text-gray-600">{config.template.name}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {config.lengthMeters}m x {config.widthMeters}m
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded border border-gray-300"
+                          style={{ backgroundColor: getColorHex(config.lineColor) }}
+                        />
+                        <span className="text-gray-600 capitalize">{config.lineColor}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {new Date(config.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Link href={`/dashboard/configurations/${config.id}`}>
+                          <Button variant="ghost" size="sm">
+                            View
+                          </Button>
+                        </Link>
+                        <Link href={`/dashboard/editor?configuration=${config.id}&sportsground=${config.sportsground.id}`}>
+                          <Button variant="ghost" size="sm">
+                            Edit
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDelete(config.id)}
+                          disabled={deleteId === config.id}
+                        >
+                          {deleteId === config.id ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
+        /* Card View */
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredConfigurations.map((config) => (
+          {filteredAndSortedConfigurations.map((config) => (
             <Card key={config.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -267,6 +518,13 @@ export default function ConfigurationsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Results count */}
+      {!isLoading && configurations.length > 0 && (
+        <div className="mt-6 text-sm text-gray-500 text-center">
+          Showing {filteredAndSortedConfigurations.length} of {configurations.length} configurations
         </div>
       )}
     </div>
