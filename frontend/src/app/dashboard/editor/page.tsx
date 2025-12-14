@@ -1023,7 +1023,8 @@ export default function EditorPage() {
             let newRotation = dragStartRotationRef.current + angleDelta
             newRotation = ((newRotation % 360) + 360) % 360
 
-            rotationRef.current = Math.round(newRotation)
+            // Round to 0.1 degree increments for smoother rotation
+            rotationRef.current = Math.round(newRotation * 10) / 10
 
             // Redraw field lines
             redrawFieldLines(fieldCenterRef.current, fieldLengthRef.current, fieldWidthRef.current, rotationRef.current, colorHexForDrag)
