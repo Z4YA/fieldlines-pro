@@ -3,8 +3,10 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import { useBookingCart } from '@/lib/booking-cart-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FloatingCart } from '@/components/booking/floating-cart'
 
 interface Configuration {
   id: string
@@ -39,6 +41,32 @@ export default function ConfigurationsPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  const {
+    addConfiguration,
+    removeConfiguration,
+    isSelected,
+    canAddConfiguration,
+    sportsgroundName: cartSportsgroundName,
+    totalCount: cartCount,
+  } = useBookingCart()
+
+  const handleToggleSelection = (config: Configuration) => {
+    if (isSelected(config.id)) {
+      removeConfiguration(config.id)
+    } else {
+      addConfiguration({
+        id: config.id,
+        name: config.name,
+        sportsgroundId: config.sportsground.id,
+        sportsgroundName: config.sportsground.name,
+        templateName: config.template.name,
+        lengthMeters: config.lengthMeters,
+        widthMeters: config.widthMeters,
+        lineColor: config.lineColor,
+      })
+    }
+  }
 
   const fetchConfigurations = async () => {
     const response = await api.getConfigurations()
@@ -237,6 +265,19 @@ export default function ConfigurationsPage() {
         </div>
       </div>
 
+      {/* Cart selection banner */}
+      {cartCount > 0 && cartSportsgroundName && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-green-800">
+            <span className="font-medium">Selecting from: {cartSportsgroundName}</span>
+            <span className="text-green-600 ml-1">— Only configurations from this sportsground can be added to your booking.</span>
+          </p>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
@@ -287,6 +328,9 @@ export default function ConfigurationsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-3 w-12">
+                    <span className="sr-only">Select</span>
+                  </th>
                   <th className="px-4 py-3 text-left">
                     <button
                       onClick={() => handleSort('name')}
@@ -345,8 +389,23 @@ export default function ConfigurationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredAndSortedConfigurations.map((config) => (
-                  <tr key={config.id} className="hover:bg-gray-50">
+                {filteredAndSortedConfigurations.map((config) => {
+                  const selected = isSelected(config.id)
+                  const canAdd = canAddConfiguration(config.sportsground.id)
+                  return (
+                  <tr key={config.id} className={`hover:bg-gray-50 ${selected ? 'bg-green-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={!canAdd && !selected}
+                          onChange={() => handleToggleSelection(config)}
+                          className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          title={!canAdd && !selected ? `Only configurations from ${cartSportsgroundName} can be selected` : undefined}
+                        />
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/configurations/${config.id}`}
@@ -396,7 +455,7 @@ export default function ConfigurationsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -404,11 +463,25 @@ export default function ConfigurationsPage() {
       ) : (
         /* Card View */
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedConfigurations.map((config) => (
-            <Card key={config.id} className="hover:shadow-md transition-shadow">
+          {filteredAndSortedConfigurations.map((config) => {
+            const selected = isSelected(config.id)
+            const canAdd = canAddConfiguration(config.sportsground.id)
+            return (
+            <Card key={config.id} className={`hover:shadow-md transition-shadow relative ${selected ? 'ring-2 ring-green-500' : ''}`}>
+              {/* Selection checkbox */}
+              <div className="absolute top-3 left-3 z-10">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  disabled={!canAdd && !selected}
+                  onChange={() => handleToggleSelection(config)}
+                  className="h-5 w-5 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-white shadow-sm"
+                  title={!canAdd && !selected ? `Only configurations from ${cartSportsgroundName} can be selected` : 'Add to booking cart'}
+                />
+              </div>
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pl-7">
                     <CardTitle className="text-lg truncate">{config.name}</CardTitle>
                     <CardDescription className="truncate">{config.sportsground.name}</CardDescription>
                   </div>
@@ -517,7 +590,7 @@ export default function ConfigurationsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
@@ -527,6 +600,9 @@ export default function ConfigurationsPage() {
           Showing {filteredAndSortedConfigurations.length} of {configurations.length} configurations
         </div>
       )}
+
+      {/* Floating booking cart */}
+      <FloatingCart />
     </div>
   )
 }

@@ -360,6 +360,49 @@ class ApiClient {
   async cancelBooking(id: string) {
     return this.request(`/api/bookings/${id}`, { method: 'DELETE' })
   }
+
+  // Batch booking endpoints
+  async createBatchBooking(data: {
+    sportsgroundId: string
+    configurations: Array<{
+      configurationId: string
+      preferredDate?: string
+      preferredTime?: string
+    }>
+    defaultPreferredDate: string
+    defaultPreferredTime: string
+    alternativeDate?: string
+    notes?: string
+    contactPreference: 'phone' | 'email' | 'both'
+  }) {
+    return this.request<{
+      bookingGroup: {
+        id: string
+        groupReferenceNumber: string
+        status: string
+        createdAt: string
+      }
+      bookings: Array<{
+        id: string
+        referenceNumber: string
+        configurationId: string
+        configurationName: string
+        preferredDate: string
+        preferredTime: string
+      }>
+    }>('/api/bookings/batch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getBookingGroup(id: string) {
+    return this.request(`/api/bookings/groups/${id}`)
+  }
+
+  async cancelBookingGroup(id: string) {
+    return this.request(`/api/bookings/groups/${id}`, { method: 'DELETE' })
+  }
 }
 
 export const api = new ApiClient()

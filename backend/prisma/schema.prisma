@@ -31,6 +31,7 @@ model User {
   sportsgrounds  Sportsground[]
   configurations FieldConfiguration[]
   bookings       Booking[]
+  bookingGroups  BookingGroup[]
 
   @@map("users")
 }
@@ -50,6 +51,7 @@ model Sportsground {
   // Relations
   user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   configurations FieldConfiguration[]
+  bookingGroups  BookingGroup[]
 
   @@map("sportsgrounds")
 }
@@ -100,22 +102,47 @@ model FieldConfiguration {
 }
 
 model Booking {
-  id                 String   @id @default(uuid())
-  userId             String   @map("user_id")
-  configurationId    String   @map("configuration_id")
-  referenceNumber    String   @unique @map("reference_number")
-  preferredDate      DateTime @map("preferred_date")
-  preferredTime      String   @map("preferred_time")
-  alternativeDate    DateTime? @map("alternative_date")
+  id                 String        @id @default(uuid())
+  userId             String        @map("user_id")
+  configurationId    String        @map("configuration_id")
+  bookingGroupId     String?       @map("booking_group_id")
+  referenceNumber    String        @unique @map("reference_number")
+  preferredDate      DateTime      @map("preferred_date")
+  preferredTime      String        @map("preferred_time")
+  alternativeDate    DateTime?     @map("alternative_date")
+  usesGroupDefaults  Boolean       @default(true) @map("uses_group_defaults")
   notes              String?
-  contactPreference  String   @map("contact_preference")
-  status             String   @default("pending") // pending, confirmed, completed, cancelled
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  contactPreference  String        @map("contact_preference")
+  status             String        @default("pending") // pending, confirmed, completed, cancelled
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
 
   // Relations
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   configuration FieldConfiguration @relation(fields: [configurationId], references: [id])
+  bookingGroup  BookingGroup?      @relation(fields: [bookingGroupId], references: [id])
 
   @@map("bookings")
+}
+
+model BookingGroup {
+  id                   String    @id @default(uuid())
+  userId               String    @map("user_id")
+  sportsgroundId       String    @map("sportsground_id")
+  groupReferenceNumber String    @unique @map("group_reference_number")
+  defaultPreferredDate DateTime  @map("default_preferred_date")
+  defaultPreferredTime String    @map("default_preferred_time")
+  alternativeDate      DateTime? @map("alternative_date")
+  notes                String?
+  contactPreference    String    @map("contact_preference")
+  status               String    @default("pending") // pending, confirmed, completed, cancelled
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sportsground Sportsground @relation(fields: [sportsgroundId], references: [id])
+  bookings     Booking[]
+
+  @@map("booking_groups")
 }
