@@ -88,7 +88,9 @@ export default function EditorPage() {
   const isDraggingRef = useRef(false)
   const dragStartAngleRef = useRef(0)
   const dragStartRotationRef = useRef(0)
-  const fixedEdgePositionRef = useRef<{ x: number; y: number } | null>(null)
+  // Store fixed edge world position and original center at drag start
+  const fixedEdgeWorldPosRef = useRef<{ lat: number; lng: number } | null>(null)
+  const dragStartCenterRef = useRef<{ lat: number; lng: number } | null>(null)
 
   // Refs for current values to use in event handlers
   const fieldCenterRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -813,28 +815,48 @@ export default function EditorPage() {
 
         marker.addListener('dragstart', () => {
           isDraggingRef.current = true
-          // Store the fixed (opposite) edge position in local coordinates
+          if (!fieldCenterRef.current) return
+
+          // Store the original center at drag start
+          dragStartCenterRef.current = { ...fieldCenterRef.current }
+
+          const center = fieldCenterRef.current
           const halfL = fieldLengthRef.current / 2
           const halfW = fieldWidthRef.current / 2
+          const rotationRad = (rotationRef.current * Math.PI) / 180
+          const metersPerDegreeLat = 111320
+          const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+
+          // Calculate and store the fixed (opposite) edge's WORLD position
           if (edge.type === 'length') {
-            // For length edges, fix the opposite edge's Y position
-            fixedEdgePositionRef.current = { x: 0, y: -edge.dir * halfL }
+            // For length edges (top/bottom), fixed edge is on opposite Y side
+            const fixedLocalY = -edge.dir * halfL
+            fixedEdgeWorldPosRef.current = {
+              lat: center.lat + (fixedLocalY / metersPerDegreeLat) * Math.cos(rotationRad),
+              lng: center.lng + (fixedLocalY / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
+            }
           } else {
-            // For width edges, fix the opposite edge's X position
-            fixedEdgePositionRef.current = { x: -edge.dir * halfW, y: 0 }
+            // For width edges (left/right), fixed edge is on opposite X side
+            const fixedLocalX = -edge.dir * halfW
+            fixedEdgeWorldPosRef.current = {
+              lat: center.lat - (fixedLocalX / metersPerDegreeLng) * Math.sin(rotationRad) * (metersPerDegreeLng / metersPerDegreeLat),
+              lng: center.lng + (fixedLocalX / metersPerDegreeLng) * Math.cos(rotationRad)
+            }
           }
         })
 
         marker.addListener('drag', (e: google.maps.MapMouseEvent) => {
-          if (e.latLng && fieldCenterRef.current) {
-            const center = fieldCenterRef.current
+          if (e.latLng && dragStartCenterRef.current && fixedEdgeWorldPosRef.current) {
+            // Use the ORIGINAL center from drag start for position calculations
+            const originalCenter = dragStartCenterRef.current
+            const fixedEdgeWorld = fixedEdgeWorldPosRef.current
             const metersPerDegreeLat = 111320
-            const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
+            const metersPerDegreeLng = 111320 * Math.cos((originalCenter.lat * Math.PI) / 180)
             const rotationRad = (rotationRef.current * Math.PI) / 180
 
-            // Get drag position in geographic coordinates
-            const dLat = e.latLng.lat() - center.lat
-            const dLng = e.latLng.lng() - center.lng
+            // Get drag position relative to ORIGINAL center
+            const dLat = e.latLng.lat() - originalCenter.lat
+            const dLng = e.latLng.lng() - originalCenter.lng
 
             // Convert to meters first (uniform units), then apply inverse rotation
             const metersNorth = dLat * metersPerDegreeLat
@@ -846,18 +868,20 @@ export default function EditorPage() {
 
             let newLength = fieldLengthRef.current
             let newWidth = fieldWidthRef.current
-            let newCenter = { ...center }
+            let newCenter = { ...originalCenter }
             const template = selectedTemplateRef.current
 
-            if (!fixedEdgePositionRef.current) return
+            // Also get fixed edge in local coords relative to original center
+            const fixedDLat = fixedEdgeWorld.lat - originalCenter.lat
+            const fixedDLng = fixedEdgeWorld.lng - originalCenter.lng
+            const fixedMetersNorth = fixedDLat * metersPerDegreeLat
+            const fixedMetersEast = fixedDLng * metersPerDegreeLng
+            const fixedLocalX = fixedMetersEast * Math.cos(-rotationRad) - fixedMetersNorth * Math.sin(-rotationRad)
+            const fixedLocalY = fixedMetersEast * Math.sin(-rotationRad) + fixedMetersNorth * Math.cos(-rotationRad)
 
             if (edge.type === 'length') {
-              // Use the stored fixed opposite edge position
-              const fixedY = fixedEdgePositionRef.current.y
-              // New edge position is where the user dragged
-              const newEdgeY = localY
-              // New length is distance between fixed edge and dragged edge
-              const rawLength = Math.abs(newEdgeY - fixedY)
+              // New length is distance between fixed edge and dragged edge (in Y direction)
+              const rawLength = Math.abs(localY - fixedLocalY)
               newLength = Math.round(rawLength)
 
               // Apply constraints
@@ -865,51 +889,29 @@ export default function EditorPage() {
                 newLength = Math.min(Math.max(newLength, template.minLength), template.maxLength)
               }
 
-              // Calculate constrained edge position
-              const constrainedEdgeY = fixedY + edge.dir * newLength
-              // New center is midpoint between fixed and constrained edge
-              const newCenterY = (fixedY + constrainedEdgeY) / 2
-
-              // Convert new center offset to lat/lng (rotate local Y offset to world coords)
-              const newCenterLat = center.lat + (newCenterY / metersPerDegreeLat) * Math.cos(rotationRad)
-              const newCenterLng = center.lng + (newCenterY / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
-
-              // But we need to account for the original center offset - the fixed edge position was relative to original center
-              // The fixed edge in world coords is: originalCenter + fixedY (rotated)
-              // We want to find newCenter such that: newCenter + newHalfL * (-edge.dir) = originalCenter + fixedY (rotated)
-              // Simpler approach: calculate world position of fixed edge, then place new center relative to it
-              const fixedEdgeLat = center.lat + (fixedY / metersPerDegreeLat) * Math.cos(rotationRad)
-              const fixedEdgeLng = center.lng + (fixedY / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
-
               // New center is at fixedEdge + (newLength/2 * edge.dir) in the field's Y direction
               const centerOffsetFromFixed = (newLength / 2) * edge.dir
               newCenter = {
-                lat: fixedEdgeLat + (centerOffsetFromFixed / metersPerDegreeLat) * Math.cos(rotationRad),
-                lng: fixedEdgeLng + (centerOffsetFromFixed / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
+                lat: fixedEdgeWorld.lat + (centerOffsetFromFixed / metersPerDegreeLat) * Math.cos(rotationRad),
+                lng: fixedEdgeWorld.lng + (centerOffsetFromFixed / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
               }
 
               fieldLengthRef.current = newLength
               fieldCenterRef.current = newCenter
             } else {
-              // Width (left/right edges)
-              const fixedX = fixedEdgePositionRef.current.x
-              const newEdgeX = localX
-              const rawWidth = Math.abs(newEdgeX - fixedX)
+              // Width (left/right edges) - distance in X direction
+              const rawWidth = Math.abs(localX - fixedLocalX)
               newWidth = Math.round(rawWidth)
 
               if (template) {
                 newWidth = Math.min(Math.max(newWidth, template.minWidth), template.maxWidth)
               }
 
-              // Calculate world position of fixed edge
-              const fixedEdgeLat = center.lat - (fixedX / metersPerDegreeLng) * Math.sin(rotationRad) * (metersPerDegreeLng / metersPerDegreeLat)
-              const fixedEdgeLng = center.lng + (fixedX / metersPerDegreeLng) * Math.cos(rotationRad)
-
               // New center is at fixedEdge + (newWidth/2 * edge.dir) in the field's X direction
               const centerOffsetFromFixed = (newWidth / 2) * edge.dir
               newCenter = {
-                lat: fixedEdgeLat - (centerOffsetFromFixed / metersPerDegreeLng) * Math.sin(rotationRad) * (metersPerDegreeLng / metersPerDegreeLat),
-                lng: fixedEdgeLng + (centerOffsetFromFixed / metersPerDegreeLng) * Math.cos(rotationRad)
+                lat: fixedEdgeWorld.lat - (centerOffsetFromFixed / metersPerDegreeLng) * Math.sin(rotationRad) * (metersPerDegreeLng / metersPerDegreeLat),
+                lng: fixedEdgeWorld.lng + (centerOffsetFromFixed / metersPerDegreeLng) * Math.cos(rotationRad)
               }
 
               fieldWidthRef.current = newWidth
