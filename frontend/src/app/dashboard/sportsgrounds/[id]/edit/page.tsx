@@ -78,6 +78,7 @@ export default function EditSportsgroundPage() {
     const newPosition = { lat: result.center[1], lng: result.center[0] }
     setMarkerPosition(newPosition)
     setMapCenter(newPosition)
+    setMapZoom(17) // Zoom in to see the field clearly
   }
 
   const handleMapClick = (latLng: { lat: number; lng: number }) => {
@@ -274,6 +275,8 @@ export default function EditSportsgroundPage() {
               <GoogleMap
                 initialCenter={mapCenter}
                 initialZoom={mapZoom}
+                center={mapCenter}
+                zoom={mapZoom}
                 onMapClick={handleMapClick}
                 onMapMove={handleMapMove}
                 markerPosition={markerPosition}

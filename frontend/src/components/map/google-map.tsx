@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 interface GoogleMapProps {
   initialCenter?: { lat: number; lng: number }
   initialZoom?: number
+  center?: { lat: number; lng: number } | null  // Controlled center - map pans here when changed
+  zoom?: number  // Controlled zoom - map zooms here when changed
   onMapClick?: (latLng: { lat: number; lng: number }) => void
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void
   markerPosition?: { lat: number; lng: number } | null
@@ -40,6 +42,8 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
 export function GoogleMap({
   initialCenter = { lat: -33.8688, lng: 151.2093 }, // Sydney default
   initialZoom = 15,
+  center,
+  zoom,
   onMapClick,
   onMapMove,
   markerPosition,
@@ -138,12 +142,24 @@ export function GoogleMap({
     }
   }, [markerPosition, isLoaded])
 
-  // Fly to location
-  const panTo = useCallback((center: { lat: number; lng: number }, zoom?: number) => {
-    if (mapRef.current) {
+  // Pan to controlled center/zoom when they change
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return
+
+    if (center) {
       mapRef.current.panTo(center)
-      if (zoom !== undefined) {
-        mapRef.current.setZoom(zoom)
+    }
+    if (zoom !== undefined) {
+      mapRef.current.setZoom(zoom)
+    }
+  }, [center, zoom, isLoaded])
+
+  // Fly to location
+  const panTo = useCallback((centerPos: { lat: number; lng: number }, zoomLevel?: number) => {
+    if (mapRef.current) {
+      mapRef.current.panTo(centerPos)
+      if (zoomLevel !== undefined) {
+        mapRef.current.setZoom(zoomLevel)
       }
     }
   }, [])
