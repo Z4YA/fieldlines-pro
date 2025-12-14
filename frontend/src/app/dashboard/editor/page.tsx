@@ -821,15 +821,17 @@ export default function EditorPage() {
             const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180)
             const rotationRad = (rotationRef.current * Math.PI) / 180
 
-            // Get drag position in local coordinates
+            // Get drag position in geographic coordinates
             const dLat = e.latLng.lat() - center.lat
             const dLng = e.latLng.lng() - center.lng
 
-            const unrotatedLat = dLat * Math.cos(-rotationRad) - dLng * Math.sin(-rotationRad)
-            const unrotatedLng = dLat * Math.sin(-rotationRad) + dLng * Math.cos(-rotationRad)
+            // Convert to meters first (uniform units), then apply inverse rotation
+            const metersNorth = dLat * metersPerDegreeLat
+            const metersEast = dLng * metersPerDegreeLng
 
-            const localY = unrotatedLat * metersPerDegreeLat
-            const localX = unrotatedLng * metersPerDegreeLng
+            // Convert from geographic to local coordinates (inverse rotation)
+            const localX = metersEast * Math.cos(-rotationRad) - metersNorth * Math.sin(-rotationRad)
+            const localY = metersEast * Math.sin(-rotationRad) + metersNorth * Math.cos(-rotationRad)
 
             let newLength = fieldLengthRef.current
             let newWidth = fieldWidthRef.current
@@ -850,18 +852,7 @@ export default function EditorPage() {
                 newLength = Math.min(Math.max(newLength, template.minLength), template.maxLength)
               }
 
-              // Calculate new center (midpoint between fixed edge and new edge)
-              const constrainedEdgeY = oppositeY + edge.dir * newLength
-              const newCenterY = (oppositeY + constrainedEdgeY) / 2
-
-              // Convert new center back to lat/lng
-              const newCenterLatOffset = (newCenterY / metersPerDegreeLat) * Math.cos(rotationRad)
-              const newCenterLngOffset = (newCenterY / metersPerDegreeLat) * Math.sin(rotationRad)
-              newCenter = {
-                lat: center.lat + newCenterLatOffset - (unrotatedLat - newCenterY / metersPerDegreeLat * metersPerDegreeLat) * 0,
-                lng: center.lng + newCenterLngOffset
-              }
-              // Simpler: just shift center by half the difference
+              // Shift center by half the change in length (to keep opposite edge fixed)
               const centerShift = (newLength - fieldLengthRef.current) / 2 * edge.dir
               const shiftLat = (centerShift / metersPerDegreeLat) * Math.cos(rotationRad)
               const shiftLng = (centerShift / metersPerDegreeLat) * Math.sin(rotationRad) * (metersPerDegreeLat / metersPerDegreeLng)
