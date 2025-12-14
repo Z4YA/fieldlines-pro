@@ -393,7 +393,13 @@ export default function ConfigurationsPage() {
                   const selected = isSelected(config.id)
                   const canAdd = canAddConfiguration(config.sportsground.id)
                   return (
-                  <tr key={config.id} className={`hover:bg-gray-50 ${selected ? 'bg-green-50' : ''}`}>
+                  <tr
+                    key={config.id}
+                    className={`
+                      ${selected ? 'bg-green-50' : ''}
+                      ${!canAdd && !selected ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}
+                    `}
+                  >
                     <td className="px-4 py-3">
                       <div className="relative">
                         <input
@@ -409,26 +415,26 @@ export default function ConfigurationsPage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/dashboard/configurations/${config.id}`}
-                        className="font-medium text-gray-900 hover:text-green-600"
+                        className={`font-medium hover:text-green-600 ${!canAdd && !selected ? 'text-gray-500' : 'text-gray-900'}`}
                       >
                         {config.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{config.sportsground.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{config.template.name}</td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className={`px-4 py-3 ${!canAdd && !selected ? 'text-gray-400' : 'text-gray-600'}`}>{config.sportsground.name}</td>
+                    <td className={`px-4 py-3 ${!canAdd && !selected ? 'text-gray-400' : 'text-gray-600'}`}>{config.template.name}</td>
+                    <td className={`px-4 py-3 ${!canAdd && !selected ? 'text-gray-400' : 'text-gray-600'}`}>
                       {config.lengthMeters}m x {config.widthMeters}m
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className={`flex items-center gap-2 ${!canAdd && !selected ? 'opacity-50' : ''}`}>
                         <div
                           className="w-4 h-4 rounded border border-gray-300"
                           style={{ backgroundColor: getColorHex(config.lineColor) }}
                         />
-                        <span className="text-gray-600 capitalize">{config.lineColor}</span>
+                        <span className={`capitalize ${!canAdd && !selected ? 'text-gray-400' : 'text-gray-600'}`}>{config.lineColor}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className={`px-4 py-3 ${!canAdd && !selected ? 'text-gray-400' : 'text-gray-600'}`}>
                       {new Date(config.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
@@ -467,7 +473,14 @@ export default function ConfigurationsPage() {
             const selected = isSelected(config.id)
             const canAdd = canAddConfiguration(config.sportsground.id)
             return (
-            <Card key={config.id} className={`hover:shadow-md transition-shadow relative ${selected ? 'ring-2 ring-green-500' : ''}`}>
+            <Card
+              key={config.id}
+              className={`
+                transition-shadow relative
+                ${selected ? 'ring-2 ring-green-500' : ''}
+                ${!canAdd && !selected ? 'opacity-50 grayscale-[30%]' : 'hover:shadow-md'}
+              `}
+            >
               {/* Selection checkbox */}
               <div className="absolute top-3 left-3 z-10">
                 <input
@@ -482,7 +495,7 @@ export default function ConfigurationsPage() {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0 pl-7">
-                    <CardTitle className="text-lg truncate">{config.name}</CardTitle>
+                    <CardTitle className={`text-lg truncate ${!canAdd && !selected ? 'text-gray-500' : ''}`}>{config.name}</CardTitle>
                     <CardDescription className="truncate">{config.sportsground.name}</CardDescription>
                   </div>
                   <div className="flex items-center space-x-1 ml-2">
