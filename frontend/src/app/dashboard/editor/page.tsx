@@ -882,7 +882,8 @@ export default function EditorPage() {
             if (edge.type === 'length') {
               // New length is distance between fixed edge and dragged edge (in Y direction)
               const rawLength = Math.abs(localY - fixedLocalY)
-              newLength = Math.round(rawLength)
+              // Round to 0.5m increments for finer control
+              newLength = Math.round(rawLength * 2) / 2
 
               // Apply constraints
               if (template) {
@@ -901,7 +902,8 @@ export default function EditorPage() {
             } else {
               // Width (left/right edges) - distance in X direction
               const rawWidth = Math.abs(localX - fixedLocalX)
-              newWidth = Math.round(rawWidth)
+              // Round to 0.5m increments for finer control
+              newWidth = Math.round(rawWidth * 2) / 2
 
               if (template) {
                 newWidth = Math.min(Math.max(newWidth, template.minWidth), template.maxWidth)
