@@ -9,6 +9,7 @@ interface User {
   fullName: string
   phone: string
   organization?: string
+  role: 'user' | 'admin' | 'super_admin'
   emailVerified: boolean
 }
 
@@ -16,6 +17,8 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  isAdmin: boolean
+  isSuperAdmin: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (data: {
     email: string
@@ -65,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (response.data?.user) {
       setUser({
         ...response.data.user,
+        role: response.data.user.role || 'user',
         emailVerified: true, // If they can login, email is verified
       })
     }
@@ -90,12 +94,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  const isSuperAdmin = user?.role === 'super_admin'
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAuthenticated: !!user,
+        isAdmin,
+        isSuperAdmin,
         login,
         register,
         logout,

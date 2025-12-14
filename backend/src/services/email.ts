@@ -331,3 +331,68 @@ export async function sendProviderNotificationEmail(data: ProviderNotificationDa
     console.error('Failed to send provider notification email:', error)
   }
 }
+
+export async function sendAdminInvitationEmail(email: string, token: string, inviterName: string) {
+  const inviteUrl = `${FRONTEND_URL}/admin/register?token=${token}`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #ea580c; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px; background: #f9f9f9; }
+        .button { display: inline-block; padding: 12px 24px; background: #ea580c; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }
+        .highlight { background: #fff7ed; padding: 15px; border-radius: 6px; border-left: 4px solid #ea580c; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>XACTLINE Admin Invitation</h1>
+        </div>
+        <div class="content">
+          <h2>You're Invited!</h2>
+          <p>Hi,</p>
+          <p><strong>${inviterName}</strong> has invited you to join XACTLINE as an administrator.</p>
+
+          <div class="highlight">
+            <p><strong>As an admin, you will be able to:</strong></p>
+            <ul>
+              <li>View and manage all bookings</li>
+              <li>Update booking statuses</li>
+              <li>View all users and their data</li>
+              <li>Manage field templates</li>
+              <li>Access platform statistics</li>
+            </ul>
+          </div>
+
+          <p>Click the button below to complete your registration:</p>
+          <a href="${inviteUrl}" class="button">Accept Invitation</a>
+
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>${inviteUrl}</p>
+
+          <p><strong>This invitation will expire in 7 days.</strong></p>
+
+          <p>If you didn't expect this invitation or have questions, please contact the person who invited you.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} XACTLINE. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+
+  try {
+    await sendEmail(email, 'You are invited to join XACTLINE as an Administrator', html)
+    console.log(`Admin invitation email sent to ${email}`)
+  } catch (error) {
+    console.error('Failed to send admin invitation email:', error)
+    throw error // Re-throw to let the caller handle it
+  }
+}

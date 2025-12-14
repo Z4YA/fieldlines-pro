@@ -13,6 +13,7 @@ import sportsgroundRoutes from './routes/sportsgrounds.js'
 import templateRoutes from './routes/templates.js'
 import configurationRoutes from './routes/configurations.js'
 import bookingRoutes from './routes/bookings.js'
+import adminRoutes from './routes/admin.js'
 
 const app = express()
 const PORT = process.env.PORT || 9501
@@ -38,6 +39,7 @@ app.use('/api/sportsgrounds', sportsgroundRoutes)
 app.use('/api/templates', templateRoutes)
 app.use('/api/configurations', configurationRoutes)
 app.use('/api/bookings', bookingRoutes)
+app.use('/api/admin', adminRoutes)
 
 // 404 handler
 app.use((req, res) => {

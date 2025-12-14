@@ -17,6 +17,7 @@ model User {
   fullName            String   @map("full_name")
   phone               String
   organization        String?
+  role                String   @default("user") // "user" | "admin" | "super_admin"
   emailVerified       Boolean  @default(false) @map("email_verified")
   verificationToken   String?  @map("verification_token")
   resetToken          String?  @map("reset_token")
@@ -28,10 +29,11 @@ model User {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Relations
-  sportsgrounds  Sportsground[]
-  configurations FieldConfiguration[]
-  bookings       Booking[]
-  bookingGroups  BookingGroup[]
+  sportsgrounds    Sportsground[]
+  configurations   FieldConfiguration[]
+  bookings         Booking[]
+  bookingGroups    BookingGroup[]
+  sentInvitations  AdminInvitation[] @relation("InvitedBy")
 
   @@map("users")
 }
@@ -145,4 +147,19 @@ model BookingGroup {
   bookings     Booking[]
 
   @@map("booking_groups")
+}
+
+model AdminInvitation {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  token       String    @unique
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@map("admin_invitations")
 }

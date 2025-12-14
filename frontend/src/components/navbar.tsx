@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 
 export function Navbar() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
@@ -51,6 +51,17 @@ export function Navbar() {
               >
                 Bookings
               </Link>
+              {isAdmin && (
+                <>
+                  <div className="h-6 w-px bg-gray-300 self-center" />
+                  <Link
+                    href="/dashboard/admin"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-orange-600 border-b-2 border-transparent hover:border-orange-500"
+                  >
+                    Admin
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -142,6 +153,14 @@ export function Navbar() {
             >
               Bookings
             </Link>
+            {isAdmin && (
+              <Link
+                href="/dashboard/admin"
+                className="block pl-3 pr-4 py-2 text-base font-medium text-orange-600 hover:bg-orange-50"
+              >
+                Admin Panel
+              </Link>
+            )}
           </div>
           <div className="pt-4 pb-3 border-t">
             <div className="flex items-center px-4">

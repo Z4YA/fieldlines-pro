@@ -93,6 +93,7 @@ class ApiClient {
         fullName: string
         phone: string
         organization?: string
+        role: 'user' | 'admin' | 'super_admin'
       }
     }>('/api/auth/login', {
       method: 'POST',
@@ -140,6 +141,7 @@ class ApiClient {
       fullName: string
       phone: string
       organization?: string
+      role: 'user' | 'admin' | 'super_admin'
       emailVerified: boolean
       createdAt: string
       updatedAt: string
@@ -402,6 +404,333 @@ class ApiClient {
 
   async cancelBookingGroup(id: string) {
     return this.request(`/api/bookings/groups/${id}`, { method: 'DELETE' })
+  }
+
+  // ============ ADMIN ENDPOINTS ============
+
+  // Admin - Validate invitation token
+  async validateAdminInvitation(token: string) {
+    return this.request<{
+      valid: boolean
+      email: string
+      invitedBy: string
+      expiresAt: string
+    }>('/api/auth/admin/validate-invitation', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    })
+  }
+
+  // Admin - Register with invitation
+  async registerAdmin(data: {
+    token: string
+    fullName: string
+    phone: string
+    password: string
+    organization?: string
+  }) {
+    return this.request<{ message: string; userId: string }>('/api/auth/admin/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Admin - Get dashboard stats
+  async getAdminStats() {
+    return this.request<{
+      users: { total: number }
+      bookings: { total: number; pending: number; confirmed: number; completed: number }
+      sportsgrounds: { total: number }
+      configurations: { total: number }
+      recentBookings: Array<{
+        id: string
+        referenceNumber: string
+        status: string
+        user: { fullName: string; email: string }
+        configuration: {
+          sportsground: { name: string }
+          template: { name: string }
+        }
+      }>
+    }>('/api/admin/stats')
+  }
+
+  // Admin - Users
+  async getAdminUsers(params?: { page?: number; limit?: number; search?: string; role?: string }) {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', params.page.toString())
+    if (params?.limit) query.set('limit', params.limit.toString())
+    if (params?.search) query.set('search', params.search)
+    if (params?.role) query.set('role', params.role)
+    const queryString = query.toString()
+    return this.request<{
+      users: Array<{
+        id: string
+        email: string
+        fullName: string
+        phone: string
+        organization?: string
+        role: string
+        emailVerified: boolean
+        createdAt: string
+        lastLoginAt?: string
+        _count: { sportsgrounds: number; configurations: number; bookings: number }
+      }>
+      pagination: { page: number; limit: number; total: number; pages: number }
+    }>(`/api/admin/users${queryString ? `?${queryString}` : ''}`)
+  }
+
+  async getAdminUser(id: string) {
+    return this.request<{
+      id: string
+      email: string
+      fullName: string
+      phone: string
+      organization?: string
+      role: string
+      emailVerified: boolean
+      createdAt: string
+      updatedAt: string
+      lastLoginAt?: string
+      sportsgrounds: Array<{ id: string; name: string; address: string; createdAt: string }>
+      configurations: Array<{
+        id: string
+        name: string
+        lengthMeters: number
+        widthMeters: number
+        lineColor: string
+        sportsground: { name: string }
+        template: { name: string }
+        createdAt: string
+      }>
+      bookings: Array<{
+        id: string
+        referenceNumber: string
+        preferredDate: string
+        preferredTime: string
+        status: string
+        createdAt: string
+        configuration: { name: string; sportsground: { name: string } }
+      }>
+    }>(`/api/admin/users/${id}`)
+  }
+
+  async updateUserRole(id: string, role: string) {
+    return this.request<{ id: string; email: string; fullName: string; role: string }>(
+      `/api/admin/users/${id}/role`,
+      { method: 'PUT', body: JSON.stringify({ role }) }
+    )
+  }
+
+  // Admin - Bookings
+  async getAdminBookings(params?: { page?: number; limit?: number; status?: string; search?: string }) {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', params.page.toString())
+    if (params?.limit) query.set('limit', params.limit.toString())
+    if (params?.status) query.set('status', params.status)
+    if (params?.search) query.set('search', params.search)
+    const queryString = query.toString()
+    return this.request<{
+      bookings: Array<{
+        id: string
+        referenceNumber: string
+        preferredDate: string
+        preferredTime: string
+        alternativeDate?: string
+        notes?: string
+        contactPreference: string
+        status: string
+        createdAt: string
+        user: { id: string; fullName: string; email: string; phone: string }
+        configuration: {
+          id: string
+          name: string
+          lengthMeters: number
+          widthMeters: number
+          lineColor: string
+          sportsground: { id: string; name: string; address: string }
+          template: { id: string; name: string; sport: string }
+        }
+      }>
+      pagination: { page: number; limit: number; total: number; pages: number }
+    }>(`/api/admin/bookings${queryString ? `?${queryString}` : ''}`)
+  }
+
+  async getAdminBooking(id: string) {
+    return this.request<{
+      id: string
+      referenceNumber: string
+      preferredDate: string
+      preferredTime: string
+      status: string
+      notes: string | null
+      createdAt: string
+      updatedAt: string
+      user: {
+        id: string
+        fullName: string
+        email: string
+        phone: string
+      }
+      configuration: {
+        id: string
+        name: string
+        selectedMarkers: unknown
+        sportsground: {
+          id: string
+          name: string
+          address: string
+        }
+        template: {
+          id: string
+          name: string
+          sport: string
+        }
+      }
+    }>(`/api/admin/bookings/${id}`)
+  }
+
+  async updateBookingStatus(id: string, status: string) {
+    return this.request(`/api/admin/bookings/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+  }
+
+  // Admin - Sportsgrounds
+  async getAdminSportsgrounds(params?: { page?: number; limit?: number; search?: string }) {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', params.page.toString())
+    if (params?.limit) query.set('limit', params.limit.toString())
+    if (params?.search) query.set('search', params.search)
+    const queryString = query.toString()
+    return this.request<{
+      sportsgrounds: Array<{
+        id: string
+        name: string
+        address: string
+        latitude: number
+        longitude: number
+        createdAt: string
+        user: { id: string; fullName: string; email: string }
+        _count: { configurations: number }
+      }>
+      pagination: { page: number; limit: number; total: number; pages: number }
+    }>(`/api/admin/sportsgrounds${queryString ? `?${queryString}` : ''}`)
+  }
+
+  // Admin - Configurations
+  async getAdminConfigurations(params?: { page?: number; limit?: number; search?: string }) {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', params.page.toString())
+    if (params?.limit) query.set('limit', params.limit.toString())
+    if (params?.search) query.set('search', params.search)
+    const queryString = query.toString()
+    return this.request<{
+      configurations: Array<{
+        id: string
+        name: string
+        lengthMeters: number
+        widthMeters: number
+        lineColor: string
+        rotationDegrees: number
+        createdAt: string
+        user: { id: string; fullName: string; email: string }
+        sportsground: { id: string; name: string; address: string }
+        template: { id: string; name: string; sport: string }
+        _count: { bookings: number }
+      }>
+      pagination: { page: number; limit: number; total: number; pages: number }
+    }>(`/api/admin/configurations${queryString ? `?${queryString}` : ''}`)
+  }
+
+  // Admin - Templates (CRUD)
+  async getAdminTemplates() {
+    return this.request<Array<{
+      id: string
+      sport: string
+      name: string
+      description?: string
+      minLength: number
+      maxLength: number
+      minWidth: number
+      maxWidth: number
+      defaultLength: number
+      defaultWidth: number
+      interiorElements: unknown
+      isActive: boolean
+      createdAt: string
+      _count: { configurations: number }
+    }>>('/api/admin/templates')
+  }
+
+  async createTemplate(data: {
+    sport: string
+    name: string
+    description?: string
+    minLength: number
+    maxLength: number
+    minWidth: number
+    maxWidth: number
+    defaultLength: number
+    defaultWidth: number
+    interiorElements: unknown
+    isActive?: boolean
+  }) {
+    return this.request('/api/admin/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateTemplate(id: string, data: Partial<{
+    sport: string
+    name: string
+    description: string
+    minLength: number
+    maxLength: number
+    minWidth: number
+    maxWidth: number
+    defaultLength: number
+    defaultWidth: number
+    interiorElements: unknown
+    isActive: boolean
+  }>) {
+    return this.request(`/api/admin/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteTemplate(id: string) {
+    return this.request(`/api/admin/templates/${id}`, { method: 'DELETE' })
+  }
+
+  // Admin - Invitations
+  async getAdminInvitations() {
+    return this.request<Array<{
+      id: string
+      email: string
+      token: string
+      expiresAt: string
+      acceptedAt?: string
+      createdAt: string
+      invitedBy: { fullName: string; email: string }
+    }>>('/api/admin/invitations')
+  }
+
+  async createAdminInvitation(email: string) {
+    return this.request<{
+      message: string
+      invitation: { id: string; email: string; expiresAt: string }
+    }>('/api/admin/invitations', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  }
+
+  async deleteAdminInvitation(id: string) {
+    return this.request('/api/admin/invitations/' + id, { method: 'DELETE' })
   }
 }
 

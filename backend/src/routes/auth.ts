@@ -164,6 +164,7 @@ router.post('/login', async (req: Request, res: Response) => {
         fullName: user.fullName,
         phone: user.phone,
         organization: user.organization,
+        role: user.role,
       },
     })
   } catch (error) {
@@ -296,6 +297,127 @@ router.post('/reset-password', async (req: Request, res: Response) => {
 router.post('/logout', (req: Request, res: Response) => {
   // For JWT-based auth, logout is handled client-side by removing the token
   res.json({ message: 'Logout successful' })
+})
+
+// ============ ADMIN REGISTRATION ============
+
+const adminRegisterSchema = z.object({
+  token: z.string().min(1, 'Invitation token is required'),
+  fullName: z.string().min(1, 'Full name is required'),
+  phone: z.string().min(1, 'Phone number is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  organization: z.string().optional(),
+})
+
+// POST /api/auth/admin/validate-invitation - Validate invitation token
+router.post('/admin/validate-invitation', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const invitation = await prisma.adminInvitation.findUnique({
+      where: { token },
+      include: {
+        invitedBy: { select: { fullName: true } }
+      }
+    })
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invalid invitation token' })
+    }
+
+    if (invitation.acceptedAt) {
+      return res.status(400).json({ error: 'This invitation has already been used' })
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This invitation has expired' })
+    }
+
+    res.json({
+      valid: true,
+      email: invitation.email,
+      invitedBy: invitation.invitedBy.fullName,
+      expiresAt: invitation.expiresAt
+    })
+  } catch (error) {
+    console.error('Validate invitation error:', error)
+    res.status(500).json({ error: 'Failed to validate invitation' })
+  }
+})
+
+// POST /api/auth/admin/register - Complete admin registration with invitation token
+router.post('/admin/register', async (req: Request, res: Response) => {
+  try {
+    const validation = adminRegisterSchema.safeParse(req.body)
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      })
+    }
+
+    const { token, fullName, phone, password, organization } = validation.data
+
+    // Find and validate invitation
+    const invitation = await prisma.adminInvitation.findUnique({
+      where: { token }
+    })
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invalid invitation token' })
+    }
+
+    if (invitation.acceptedAt) {
+      return res.status(400).json({ error: 'This invitation has already been used' })
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This invitation has expired' })
+    }
+
+    // Check if email is already registered (shouldn't happen but just in case)
+    const existingUser = await prisma.user.findUnique({
+      where: { email: invitation.email }
+    })
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'Email already registered' })
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 12)
+
+    // Create admin user and mark invitation as accepted in a transaction
+    const [user] = await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          email: invitation.email,
+          passwordHash,
+          fullName,
+          phone,
+          organization,
+          role: 'admin',
+          emailVerified: true, // Admin invitations imply verified email
+        },
+      }),
+      prisma.adminInvitation.update({
+        where: { id: invitation.id },
+        data: { acceptedAt: new Date() }
+      })
+    ])
+
+    res.status(201).json({
+      message: 'Admin registration successful. You can now log in.',
+      userId: user.id,
+    })
+  } catch (error) {
+    console.error('Admin registration error:', error)
+    res.status(500).json({ error: 'Registration failed' })
+  }
 })
 
 export default router
