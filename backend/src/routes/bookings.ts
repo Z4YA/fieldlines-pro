@@ -196,7 +196,16 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       preferredTime: booking.preferredTime,
     })
 
-    // Send notification email to provider
+    // Get all admin emails to notify
+    const admins = await prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'super_admin'] },
+      },
+      select: { email: true },
+    })
+    const adminEmails = admins.map(a => a.email)
+
+    // Send notification email to all admins
     await sendProviderNotificationEmail({
       referenceNumber: booking.referenceNumber,
       customerName: user.fullName,
@@ -216,7 +225,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       alternativeDate: booking.alternativeDate?.toLocaleDateString(),
       notes: booking.notes,
       contactPreference: booking.contactPreference,
-    })
+    }, adminEmails)
 
     res.status(201).json(booking)
   } catch (error) {
@@ -524,7 +533,16 @@ router.post('/batch', authenticate, async (req: AuthRequest, res: Response) => {
       })
     }
 
-    // Send provider notification for each booking
+    // Get all admin emails to notify
+    const admins = await prisma.user.findMany({
+      where: {
+        role: { in: ['admin', 'super_admin'] },
+      },
+      select: { email: true },
+    })
+    const adminEmails = admins.map(a => a.email)
+
+    // Send provider notification to all admins for each booking
     for (const booking of result.bookings) {
       await sendProviderNotificationEmail({
         referenceNumber: booking.referenceNumber,
@@ -545,7 +563,7 @@ router.post('/batch', authenticate, async (req: AuthRequest, res: Response) => {
         alternativeDate: booking.alternativeDate?.toLocaleDateString(),
         notes: booking.notes,
         contactPreference: booking.contactPreference,
-      })
+      }, adminEmails)
     }
 
     res.status(201).json({

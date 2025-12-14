@@ -249,8 +249,12 @@ interface ProviderNotificationData {
   contactPreference: string
 }
 
-export async function sendProviderNotificationEmail(data: ProviderNotificationData) {
-  const PROVIDER_EMAIL = process.env.PROVIDER_EMAIL || 'operations@xactline.com.au'
+export async function sendProviderNotificationEmail(data: ProviderNotificationData, adminEmails?: string[]) {
+  // Use provided admin emails, fall back to PROVIDER_EMAIL env var
+  const recipients = adminEmails && adminEmails.length > 0
+    ? adminEmails
+    : [process.env.PROVIDER_EMAIL || 'operations@xactline.com.au']
+
   const mapUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
 
   const html = `
@@ -324,11 +328,14 @@ export async function sendProviderNotificationEmail(data: ProviderNotificationDa
     </html>
   `
 
-  try {
-    await sendEmail(PROVIDER_EMAIL, `[NEW BOOKING] ${data.referenceNumber} - ${data.sportsgroundName}`, html)
-    console.log(`Provider notification email sent for ${data.referenceNumber}`)
-  } catch (error) {
-    console.error('Failed to send provider notification email:', error)
+  // Send to all admin recipients
+  for (const recipient of recipients) {
+    try {
+      await sendEmail(recipient, `[NEW BOOKING] ${data.referenceNumber} - ${data.sportsgroundName}`, html)
+      console.log(`Provider notification email sent to ${recipient} for ${data.referenceNumber}`)
+    } catch (error) {
+      console.error(`Failed to send provider notification email to ${recipient}:`, error)
+    }
   }
 }
 
