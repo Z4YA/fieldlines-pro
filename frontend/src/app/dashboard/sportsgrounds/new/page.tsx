@@ -34,6 +34,8 @@ export default function NewSportsgroundPage() {
   }) => {
     setFormData((prev) => ({
       ...prev,
+      // Auto-populate name from Google place name if not already set
+      name: prev.name || result.placeName,
       address: result.address,
       longitude: result.center[0],
       latitude: result.center[1],
