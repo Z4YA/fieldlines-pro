@@ -1,7 +1,22 @@
+import { prisma } from '../lib/prisma.js'
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.EMAIL_FROM || 'onboarding@resend.dev'
 const FROM_NAME = process.env.FROM_NAME || 'XACTLINE'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:9500'
+
+// Get provider email from database settings, falling back to env var
+export async function getProviderEmail(): Promise<string> {
+  try {
+    const setting = await prisma.systemSettings.findUnique({
+      where: { key: 'provider_email' },
+    })
+    return setting?.value || process.env.PROVIDER_EMAIL || 'operations@xactline.com.au'
+  } catch (error) {
+    console.error('Error getting provider email from settings:', error)
+    return process.env.PROVIDER_EMAIL || 'operations@xactline.com.au'
+  }
+}
 
 // Send email using Resend API
 async function sendEmail(to: string, subject: string, html: string) {
@@ -250,10 +265,14 @@ interface ProviderNotificationData {
 }
 
 export async function sendProviderNotificationEmail(data: ProviderNotificationData, adminEmails?: string[]) {
-  // Use provided admin emails, fall back to PROVIDER_EMAIL env var
-  const recipients = adminEmails && adminEmails.length > 0
-    ? adminEmails
-    : [process.env.PROVIDER_EMAIL || 'operations@xactline.com.au']
+  // Use provided admin emails, fall back to provider_email from settings/env
+  let recipients: string[]
+  if (adminEmails && adminEmails.length > 0) {
+    recipients = adminEmails
+  } else {
+    const providerEmail = await getProviderEmail()
+    recipients = [providerEmail]
+  }
 
   const mapUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
 

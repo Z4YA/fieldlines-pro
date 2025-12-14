@@ -732,6 +732,18 @@ class ApiClient {
   async deleteAdminInvitation(id: string) {
     return this.request('/api/admin/invitations/' + id, { method: 'DELETE' })
   }
+
+  // Settings
+  async getSettings() {
+    return this.request<Record<string, string>>('/api/settings')
+  }
+
+  async updateSetting(key: string, value: string) {
+    return this.request<{ key: string; value: string }>('/api/settings/' + key, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    })
+  }
 }
 
 export const api = new ApiClient()

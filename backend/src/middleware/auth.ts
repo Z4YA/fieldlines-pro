@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
+import { prisma } from '../lib/prisma.js'
 
 export interface AuthRequest extends Request {
   userId?: string
   userEmail?: string
+  userRole?: string
 }
 
 interface JWTPayload {
@@ -63,5 +65,33 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   } catch {
     // If token is invalid, continue without authentication
     next()
+  }
+}
+
+// Middleware to require admin or super_admin role
+export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true },
+    })
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Admin access required' })
+    }
+
+    req.userRole = user.role
+    next()
+  } catch (error) {
+    console.error('Admin check error:', error)
+    return res.status(500).json({ error: 'Authorization check failed' })
   }
 }
