@@ -267,7 +267,7 @@ export default function EditorPage() {
           tilt: 0,
           disableDefaultUI: false,
           zoomControl: true,
-          mapTypeControl: true,
+          mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
         })
