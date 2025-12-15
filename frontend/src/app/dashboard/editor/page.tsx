@@ -840,10 +840,10 @@ export default function EditorPage() {
       dimensionLabelsRef.current.push(marker)
     }
 
-    createDimensionLabel(toLatLng(-halfW - labelOffset, 0), `${fieldLength}m`)
-    createDimensionLabel(toLatLng(halfW + labelOffset, 0), `${fieldLength}m`)
-    createDimensionLabel(toLatLng(0, halfL + labelOffset), `${fieldWidth}m`)
-    createDimensionLabel(toLatLng(0, -halfL - labelOffset), `${fieldWidth}m`)
+    createDimensionLabel(toLatLng(fieldCenter, -halfW - labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(fieldCenter, halfW + labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(fieldCenter, 0, halfL + labelOffset), `${fieldWidth}m`)
+    createDimensionLabel(toLatLng(fieldCenter, 0, -halfL - labelOffset), `${fieldWidth}m`)
 
     // Add draggable marker at center for repositioning
     if (dragMarkerRef.current) {
