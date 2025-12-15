@@ -34,6 +34,13 @@ export default function AdminUsersPage() {
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
+  // Default to card view on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setViewMode('cards')
+    }
+  }, [])
+
   const fetchUsers = async () => {
     setIsLoading(true)
     const response = await api.getAdminUsers({

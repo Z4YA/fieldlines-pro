@@ -30,6 +30,13 @@ export default function AdminSportsgroundsPage() {
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
+  // Default to card view on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setViewMode('cards')
+    }
+  }, [])
+
   const fetchSportsgrounds = async () => {
     setIsLoading(true)
     const response = await api.getAdminSportsgrounds({

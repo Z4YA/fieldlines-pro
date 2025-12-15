@@ -35,6 +35,13 @@ export default function AdminInvitationsPage() {
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
+  // Default to card view on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setViewMode('cards')
+    }
+  }, [])
+
   useEffect(() => {
     if (!isSuperAdmin) {
       router.push('/dashboard/admin')
