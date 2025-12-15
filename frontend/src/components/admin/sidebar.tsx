@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
@@ -84,7 +85,12 @@ const superAdminItems = [
   },
 ]
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export function AdminSidebar({ isOpen = true, onClose }: AdminSidebarProps) {
   const pathname = usePathname()
   const { isSuperAdmin } = useAuth()
 
@@ -95,13 +101,33 @@ export function AdminSidebar() {
     return pathname.startsWith(href)
   }
 
-  return (
-    <div className="w-64 min-h-[calc(100vh-4rem)] bg-gray-900 text-white">
-      <div className="p-4 border-b border-gray-800">
-        <h2 className="text-lg font-semibold text-orange-500">Admin Panel</h2>
-        <p className="text-sm text-gray-400">Manage your platform</p>
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (onClose) {
+      onClose()
+    }
+  }, [pathname, onClose])
+
+  const sidebarContent = (
+    <>
+      <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-orange-500">Admin Panel</h2>
+          <p className="text-sm text-gray-400">Manage your platform</p>
+        </div>
+        {/* Close button for mobile */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden p-2 text-gray-400 hover:text-white"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
-      <nav className="p-4">
+      <nav className="p-4 flex-1 overflow-y-auto">
         <ul className="space-y-1">
           {navItems.map((item) => (
             <li key={item.href}>
@@ -156,6 +182,53 @@ export function AdminSidebar() {
           </Link>
         </div>
       </nav>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar - always visible */}
+      <div className="hidden lg:flex lg:flex-col w-64 min-h-[calc(100vh-4rem)] bg-gray-900 text-white">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar - slide-out drawer */}
+      <div
+        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-300 ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={onClose}
+        />
+        {/* Sidebar drawer */}
+        <div
+          className={`absolute left-0 top-0 h-full w-72 bg-gray-900 text-white transform transition-transform duration-300 flex flex-col ${
+            isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {sidebarContent}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// Mobile header with hamburger menu
+export function AdminMobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
+  return (
+    <div className="lg:hidden bg-gray-900 text-white px-4 py-3 flex items-center gap-3">
+      <button
+        onClick={onMenuClick}
+        className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <h2 className="text-lg font-semibold text-orange-500">Admin Panel</h2>
     </div>
   )
 }

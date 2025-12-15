@@ -206,10 +206,12 @@ export default function AdminDashboard() {
 
       {/* Recent Bookings */}
       <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 lg:p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table view */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -260,6 +262,32 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card view */}
+        <div className="md:hidden divide-y divide-gray-200">
+          {stats?.recentBookings.map((booking) => (
+            <Link
+              key={booking.id}
+              href={`/dashboard/admin/bookings/${booking.id}`}
+              className="block p-4 hover:bg-gray-50"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <span className="font-mono text-sm text-gray-900">{booking.referenceNumber}</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusBadge(booking.status)}`}>
+                  {booking.status}
+                </span>
+              </div>
+              <p className="font-medium text-gray-900">{booking.user.fullName}</p>
+              <p className="text-sm text-gray-500">{booking.configuration.sportsground.name}</p>
+              <p className="text-sm text-gray-400">{booking.configuration.template.name}</p>
+            </Link>
+          ))}
+          {(!stats?.recentBookings || stats.recentBookings.length === 0) && (
+            <div className="p-8 text-center text-gray-500">
+              No recent bookings
+            </div>
+          )}
         </div>
       </div>
     </div>
