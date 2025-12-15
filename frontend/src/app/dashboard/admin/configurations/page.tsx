@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '@/lib/api'
 
 interface Configuration {
@@ -27,12 +27,17 @@ interface Configuration {
   }
 }
 
+type SortField = 'name' | 'sportsground' | 'template' | 'owner' | 'bookings' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminConfigurationsPage() {
   const [configurations, setConfigurations] = useState<Configuration[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchConfigurations = async () => {
     setIsLoading(true)
@@ -55,6 +60,61 @@ export default function AdminConfigurationsPage() {
     e.preventDefault()
     setPagination((prev) => ({ ...prev, page: 1 }))
     fetchConfigurations()
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedConfigurations = useMemo(() => {
+    return [...configurations].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'sportsground':
+          comparison = a.sportsground.name.localeCompare(b.sportsground.name)
+          break
+        case 'template':
+          comparison = a.template.name.localeCompare(b.template.name)
+          break
+        case 'owner':
+          comparison = a.user.fullName.localeCompare(b.user.fullName)
+          break
+        case 'bookings':
+          comparison = a._count.bookings - b._count.bookings
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [configurations, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   return (
@@ -118,7 +178,7 @@ export default function AdminConfigurationsPage() {
       ) : viewMode === 'cards' ? (
         /* Card View */
         <div className="space-y-4">
-          {configurations.map((config) => (
+          {sortedConfigurations.map((config) => (
             <div key={config.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
@@ -161,16 +221,64 @@ export default function AdminConfigurationsPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Configuration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sportsground</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Template</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bookings</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Configuration
+                      <SortIcon field="name" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('sportsground')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Sportsground
+                      <SortIcon field="sportsground" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('template')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Template
+                      <SortIcon field="template" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('owner')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Owner
+                      <SortIcon field="owner" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('bookings')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Bookings
+                      <SortIcon field="bookings" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Created
+                      <SortIcon field="createdAt" />
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {configurations.map((config) => (
+                {sortedConfigurations.map((config) => (
                   <tr key={config.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900">{config.name}</p>

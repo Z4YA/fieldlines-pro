@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 
@@ -16,11 +16,16 @@ interface Template {
   }
 }
 
+type SortField = 'name' | 'sport' | 'status' | 'usage' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchTemplates = async () => {
     setIsLoading(true)
@@ -45,6 +50,58 @@ export default function AdminTemplatesPage() {
       setTemplates((prev) => prev.filter((t) => t.id !== id))
     }
     setDeletingId(null)
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedTemplates = useMemo(() => {
+    return [...templates].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'sport':
+          comparison = a.sport.localeCompare(b.sport)
+          break
+        case 'status':
+          comparison = (a.isActive ? 1 : 0) - (b.isActive ? 1 : 0)
+          break
+        case 'usage':
+          comparison = a._count.configurations - b._count.configurations
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [templates, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   return (
@@ -102,7 +159,7 @@ export default function AdminTemplatesPage() {
       ) : viewMode === 'cards' ? (
         /* Card View */
         <div className="space-y-4">
-          {templates.map((template) => (
+          {sortedTemplates.map((template) => (
             <div key={template.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
@@ -168,16 +225,56 @@ export default function AdminTemplatesPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Template</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sport</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Template
+                      <SortIcon field="name" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('sport')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Sport
+                      <SortIcon field="sport" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      <SortIcon field="status" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('usage')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Usage
+                      <SortIcon field="usage" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Created
+                      <SortIcon field="createdAt" />
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {templates.map((template) => (
+                {sortedTemplates.map((template) => (
                   <tr key={template.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>

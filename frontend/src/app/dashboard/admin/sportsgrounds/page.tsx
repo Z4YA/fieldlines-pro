@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '@/lib/api'
 
 interface Sportsground {
@@ -18,12 +18,17 @@ interface Sportsground {
   }
 }
 
+type SortField = 'name' | 'owner' | 'configurations' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminSportsgroundsPage() {
   const [sportsgrounds, setSportsgrounds] = useState<Sportsground[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchSportsgrounds = async () => {
     setIsLoading(true)
@@ -46,6 +51,55 @@ export default function AdminSportsgroundsPage() {
     e.preventDefault()
     setPagination((prev) => ({ ...prev, page: 1 }))
     fetchSportsgrounds()
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedSportsgrounds = useMemo(() => {
+    return [...sportsgrounds].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'owner':
+          comparison = a.user.fullName.localeCompare(b.user.fullName)
+          break
+        case 'configurations':
+          comparison = a._count.configurations - b._count.configurations
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [sportsgrounds, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   return (
@@ -109,7 +163,7 @@ export default function AdminSportsgroundsPage() {
       ) : viewMode === 'cards' ? (
         /* Card View */
         <div className="space-y-4">
-          {sportsgrounds.map((sg) => (
+          {sortedSportsgrounds.map((sg) => (
             <div key={sg.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
@@ -154,14 +208,46 @@ export default function AdminSportsgroundsPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sportsground</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Configurations</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Sportsground
+                      <SortIcon field="name" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('owner')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Owner
+                      <SortIcon field="owner" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('configurations')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Configurations
+                      <SortIcon field="configurations" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Created
+                      <SortIcon field="createdAt" />
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {sportsgrounds.map((sg) => (
+                {sortedSportsgrounds.map((sg) => (
                   <tr key={sg.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center">

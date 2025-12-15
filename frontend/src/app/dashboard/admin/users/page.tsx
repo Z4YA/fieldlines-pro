@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -19,6 +19,9 @@ interface User {
   }
 }
 
+type SortField = 'fullName' | 'email' | 'role' | 'status' | 'activity' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminUsersPage() {
   const { isSuperAdmin } = useAuth()
   const [users, setUsers] = useState<User[]>([])
@@ -28,6 +31,8 @@ export default function AdminUsersPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchUsers = async () => {
     setIsLoading(true)
@@ -76,6 +81,61 @@ export default function AdminUsersPage() {
 
   const formatRole = (role: string) => {
     return role === 'super_admin' ? 'Super Admin' : role.charAt(0).toUpperCase() + role.slice(1)
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'fullName':
+          comparison = a.fullName.localeCompare(b.fullName)
+          break
+        case 'email':
+          comparison = a.email.localeCompare(b.email)
+          break
+        case 'role':
+          comparison = a.role.localeCompare(b.role)
+          break
+        case 'status':
+          comparison = (a.emailVerified ? 1 : 0) - (b.emailVerified ? 1 : 0)
+          break
+        case 'activity':
+          comparison = (a._count.sportsgrounds + a._count.bookings) - (b._count.sportsgrounds + b._count.bookings)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [users, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   return (
@@ -152,7 +212,7 @@ export default function AdminUsersPage() {
       ) : viewMode === 'cards' ? (
         /* Card View */
         <div className="space-y-4">
-          {users.map((user) => (
+          {sortedUsers.map((user) => (
             <div key={user.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
@@ -234,16 +294,56 @@ export default function AdminUsersPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('fullName')}
+                  >
+                    <div className="flex items-center gap-1">
+                      User
+                      <SortIcon field="fullName" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('email')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Contact
+                      <SortIcon field="email" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('role')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Role
+                      <SortIcon field="role" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      <SortIcon field="status" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('activity')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Activity
+                      <SortIcon field="activity" />
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {users.map((user) => (
+                {sortedUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex items-center">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
@@ -21,6 +21,9 @@ interface Booking {
   }
 }
 
+type SortField = 'referenceNumber' | 'customer' | 'location' | 'preferredDate' | 'status' | 'createdAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminBookingsPage() {
   const searchParams = useSearchParams()
   const initialStatus = searchParams.get('status') || ''
@@ -32,6 +35,8 @@ export default function AdminBookingsPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('preferredDate')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const fetchBookings = async () => {
     setIsLoading(true)
@@ -76,6 +81,61 @@ export default function AdminBookingsPage() {
       cancelled: 'bg-red-100 text-red-800',
     }
     return styles[status] || 'bg-gray-100 text-gray-800'
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedBookings = useMemo(() => {
+    return [...bookings].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'referenceNumber':
+          comparison = a.referenceNumber.localeCompare(b.referenceNumber)
+          break
+        case 'customer':
+          comparison = a.user.fullName.localeCompare(b.user.fullName)
+          break
+        case 'location':
+          comparison = a.configuration.sportsground.name.localeCompare(b.configuration.sportsground.name)
+          break
+        case 'preferredDate':
+          comparison = new Date(a.preferredDate).getTime() - new Date(b.preferredDate).getTime()
+          break
+        case 'status':
+          comparison = a.status.localeCompare(b.status)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [bookings, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   return (
@@ -153,7 +213,7 @@ export default function AdminBookingsPage() {
       ) : viewMode === 'cards' ? (
         /* Card View */
         <div className="space-y-4">
-          {bookings.map((booking) => (
+          {sortedBookings.map((booking) => (
             <div key={booking.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
@@ -233,16 +293,56 @@ export default function AdminBookingsPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('referenceNumber')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Reference</span>
+                      <SortIcon field="referenceNumber" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('customer')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Customer</span>
+                      <SortIcon field="customer" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('location')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Location</span>
+                      <SortIcon field="location" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('preferredDate')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Date/Time</span>
+                      <SortIcon field="preferredDate" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Status</span>
+                      <SortIcon field="status" />
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {bookings.map((booking) => (
+                {sortedBookings.map((booking) => (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-mono text-sm">{booking.referenceNumber}</span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useRouter } from 'next/navigation'
@@ -18,6 +18,9 @@ interface Invitation {
   }
 }
 
+type SortField = 'email' | 'status' | 'invitedBy' | 'createdAt' | 'expiresAt'
+type SortDirection = 'asc' | 'desc'
+
 export default function AdminInvitationsPage() {
   const router = useRouter()
   const { isSuperAdmin } = useAuth()
@@ -29,6 +32,8 @@ export default function AdminInvitationsPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
+  const [sortField, setSortField] = useState<SortField>('createdAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -84,6 +89,64 @@ export default function AdminInvitationsPage() {
       return { label: 'Expired', style: 'bg-red-100 text-red-800' }
     }
     return { label: 'Pending', style: 'bg-yellow-100 text-yellow-800' }
+  }
+
+  const getStatusValue = (invitation: Invitation) => {
+    if (invitation.acceptedAt) return 2
+    if (new Date(invitation.expiresAt) < new Date()) return 0
+    return 1
+  }
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedInvitations = useMemo(() => {
+    return [...invitations].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'email':
+          comparison = a.email.localeCompare(b.email)
+          break
+        case 'status':
+          comparison = getStatusValue(a) - getStatusValue(b)
+          break
+        case 'invitedBy':
+          comparison = a.invitedBy.fullName.localeCompare(b.invitedBy.fullName)
+          break
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          break
+        case 'expiresAt':
+          comparison = new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [invitations, sortField, sortDirection])
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
   }
 
   if (!isSuperAdmin) {
@@ -185,7 +248,7 @@ export default function AdminInvitationsPage() {
         ) : viewMode === 'cards' ? (
           /* Card View */
           <div className="p-4 space-y-4">
-            {invitations.map((invitation) => {
+            {sortedInvitations.map((invitation) => {
               const status = getInvitationStatus(invitation)
               return (
                 <div key={invitation.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -241,16 +304,56 @@ export default function AdminInvitationsPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invited By</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('email')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Email
+                      <SortIcon field="email" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      <SortIcon field="status" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('invitedBy')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Invited By
+                      <SortIcon field="invitedBy" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Sent
+                      <SortIcon field="createdAt" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('expiresAt')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Expires
+                      <SortIcon field="expiresAt" />
+                    </div>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {invitations.map((invitation) => {
+                {sortedInvitations.map((invitation) => {
                   const status = getInvitationStatus(invitation)
                   return (
                     <tr key={invitation.id} className="hover:bg-gray-50">
