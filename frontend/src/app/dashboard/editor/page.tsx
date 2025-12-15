@@ -1679,7 +1679,10 @@ export default function EditorPage() {
 
           {/* Mobile floating button to open controls */}
           {isMobile && !sidebarOpen && (
-            <div className="absolute bottom-6 left-4 z-20">
+            <div
+              className="absolute left-4 z-20"
+              style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+            >
               {/* Pulsing glow ring */}
               <span className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"></span>
               <button
