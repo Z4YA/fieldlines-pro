@@ -835,18 +835,25 @@ router.post('/invitations', requireSuperAdmin, async (req: AuthRequest, res: Res
   try {
     const data = invitationSchema.parse(req.body)
 
-    // Check if email is already registered
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email }
+    // Normalize email to lowercase
+    const normalizedEmail = data.email.toLowerCase().trim()
+
+    // Check if email is already registered (case-insensitive)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
     })
 
     if (existingUser) {
       return res.status(400).json({ error: 'A user with this email already exists' })
     }
 
-    // Check if invitation already exists
-    const existingInvitation = await prisma.adminInvitation.findUnique({
-      where: { email: data.email }
+    // Check if invitation already exists (case-insensitive)
+    const existingInvitation = await prisma.adminInvitation.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
     })
 
     if (existingInvitation && !existingInvitation.acceptedAt) {
@@ -863,9 +870,9 @@ router.post('/invitations', requireSuperAdmin, async (req: AuthRequest, res: Res
       select: { fullName: true }
     })
 
-    // Create or update invitation
+    // Create or update invitation (use normalized email)
     const invitation = await prisma.adminInvitation.upsert({
-      where: { email: data.email },
+      where: { email: normalizedEmail },
       update: {
         token,
         expiresAt,
@@ -873,7 +880,7 @@ router.post('/invitations', requireSuperAdmin, async (req: AuthRequest, res: Res
         acceptedAt: null
       },
       create: {
-        email: data.email,
+        email: normalizedEmail,
         token,
         expiresAt,
         invitedById: req.userId!
@@ -881,7 +888,7 @@ router.post('/invitations', requireSuperAdmin, async (req: AuthRequest, res: Res
     })
 
     // Send invitation email
-    await sendAdminInvitationEmail(data.email, token, inviter?.fullName || 'Admin')
+    await sendAdminInvitationEmail(normalizedEmail, token, inviter?.fullName || 'Admin')
 
     res.status(201).json({
       message: 'Invitation sent successfully',

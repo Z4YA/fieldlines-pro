@@ -386,13 +386,15 @@ router.post('/admin/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'This invitation has expired' })
     }
 
-    // Check if email is already registered (shouldn't happen but just in case)
-    const existingUser = await prisma.user.findUnique({
-      where: { email: invitation.email }
+    // Check if email is already registered (case-insensitive check)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: invitation.email, mode: 'insensitive' }
+      }
     })
 
     if (existingUser) {
-      return res.status(409).json({ error: 'Email already registered' })
+      return res.status(409).json({ error: 'This email is already registered. Please log in instead.' })
     }
 
     // Hash password
