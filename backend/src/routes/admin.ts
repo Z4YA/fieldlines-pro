@@ -204,8 +204,8 @@ router.get('/users/:id', requireAdmin, async (req: AuthRequest, res: Response) =
   }
 })
 
-// PUT /api/admin/users/:id/role - Update user role (super_admin only)
-router.put('/users/:id/role', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
+// PUT /api/admin/users/:id/role - Update user role (admin or super_admin)
+router.put('/users/:id/role', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     const { role } = req.body
@@ -217,6 +217,41 @@ router.put('/users/:id/role', requireSuperAdmin, async (req: AuthRequest, res: R
     // Prevent changing own role
     if (id === req.userId) {
       return res.status(400).json({ error: 'Cannot change your own role' })
+    }
+
+    // Get current user's role
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true }
+    })
+
+    // Get target user's current role
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true }
+    })
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const isSuperAdmin = currentUser?.role === 'super_admin'
+
+    // Regular admins can only modify regular users
+    if (!isSuperAdmin) {
+      // Cannot modify admins or super_admins
+      if (targetUser.role === 'admin' || targetUser.role === 'super_admin') {
+        return res.status(403).json({ error: 'You can only modify regular users' })
+      }
+      // Cannot promote to admin or super_admin
+      if (role === 'admin' || role === 'super_admin') {
+        return res.status(403).json({ error: 'You cannot promote users to admin roles' })
+      }
+    }
+
+    // Super admins cannot modify other super admins
+    if (isSuperAdmin && targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot modify other super admin accounts' })
     }
 
     const user = await prisma.user.update({

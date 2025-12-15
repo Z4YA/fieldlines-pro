@@ -23,7 +23,7 @@ type SortField = 'fullName' | 'email' | 'role' | 'status' | 'activity' | 'create
 type SortDirection = 'asc' | 'desc'
 
 export default function AdminUsersPage() {
-  const { isSuperAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -66,7 +66,7 @@ export default function AdminUsersPage() {
   }
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    if (!isSuperAdmin) return
+    if (!isAdmin) return
     setUpdatingId(userId)
     const response = await api.updateUserRole(userId, newRole)
     if (!response.error) {
@@ -75,6 +75,15 @@ export default function AdminUsersPage() {
       )
     }
     setUpdatingId(null)
+  }
+
+  // Check if current user can edit a specific user's role
+  const canEditUserRole = (user: User) => {
+    if (!isAdmin) return false
+    // Super admins can edit anyone except other super admins
+    if (isSuperAdmin) return user.role !== 'super_admin'
+    // Regular admins can only edit regular users (not admins or super_admins)
+    return user.role === 'user'
   }
 
   const getRoleBadge = (role: string) => {
@@ -232,7 +241,7 @@ export default function AdminUsersPage() {
                     <div>
                       <h3 className="font-medium text-gray-900">{user.fullName}</h3>
                       <div className="flex items-center gap-2">
-                        {isSuperAdmin && user.role !== 'super_admin' ? (
+                        {canEditUserRole(user) ? (
                           <select
                             value={user.role}
                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -372,7 +381,7 @@ export default function AdminUsersPage() {
                       <p className="text-sm text-gray-500">{user.phone}</p>
                     </td>
                     <td className="px-6 py-4">
-                      {isSuperAdmin && user.role !== 'super_admin' ? (
+                      {canEditUserRole(user) ? (
                         <select
                           value={user.role}
                           onChange={(e) => handleRoleChange(user.id, e.target.value)}
