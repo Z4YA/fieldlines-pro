@@ -874,8 +874,6 @@ export default function EditorPage() {
     }
 
     // Edge markers for resizing (midpoints of each edge)
-    const halfL = fieldLength / 2
-    const halfW = fieldWidth / 2
     const colorHexForDrag = colorHex
 
     // Use built-in symbol for reliable drag detection
