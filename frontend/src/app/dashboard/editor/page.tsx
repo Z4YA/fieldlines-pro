@@ -82,6 +82,7 @@ export default function EditorPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const fieldOverlaysRef = useRef<google.maps.Polyline[]>([])
+  const dimensionLabelsRef = useRef<google.maps.Marker[]>([])
   const dragMarkerRef = useRef<google.maps.Marker | null>(null)
   const edgeMarkersRef = useRef<google.maps.Marker[]>([])
   const cornerMarkersRef = useRef<google.maps.Marker[]>([])
@@ -190,6 +191,8 @@ export default function EditorPage() {
       // Clear existing overlays and markers
       fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
       fieldOverlaysRef.current = []
+      dimensionLabelsRef.current.forEach(label => label.setMap(null))
+      dimensionLabelsRef.current = []
       if (dragMarkerRef.current) {
         dragMarkerRef.current.setMap(null)
         dragMarkerRef.current = null
@@ -307,6 +310,8 @@ export default function EditorPage() {
     return () => {
       fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
       fieldOverlaysRef.current = []
+      dimensionLabelsRef.current.forEach(label => label.setMap(null))
+      dimensionLabelsRef.current = []
       if (dragMarkerRef.current) {
         dragMarkerRef.current.setMap(null)
       }
@@ -452,9 +457,11 @@ export default function EditorPage() {
     (center: { lat: number; lng: number }, length: number, width: number, rot: number, color: string) => {
       if (!mapRef.current) return
 
-      // Clear existing polylines
+      // Clear existing polylines and dimension labels
       fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
       fieldOverlaysRef.current = []
+      dimensionLabelsRef.current.forEach(label => label.setMap(null))
+      dimensionLabelsRef.current = []
 
       const L = length
       const W = width
@@ -581,6 +588,41 @@ export default function EditorPage() {
         })
         fieldOverlaysRef.current.push(polyline)
       })
+
+      // Add dimension labels at edge midpoints
+      const createDimensionLabel = (position: { lat: number; lng: number }, text: string) => {
+        const marker = new google.maps.Marker({
+          position,
+          map: mapRef.current,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
+          },
+          label: {
+            text,
+            color: '#FFFFFF',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            className: 'dimension-label',
+          },
+        })
+        dimensionLabelsRef.current.push(marker)
+      }
+
+      // Midpoints of edges (offset slightly outward for visibility)
+      const labelOffset = 8 // meters offset from edge
+
+      // Left sideline (length) - offset left
+      createDimensionLabel(toLatLngLocal(-halfW - labelOffset, 0), `${L}m`)
+
+      // Right sideline (length) - offset right
+      createDimensionLabel(toLatLngLocal(halfW + labelOffset, 0), `${L}m`)
+
+      // Top goal line (width) - offset up
+      createDimensionLabel(toLatLngLocal(0, halfL + labelOffset), `${W}m`)
+
+      // Bottom goal line (width) - offset down
+      createDimensionLabel(toLatLngLocal(0, -halfL - labelOffset), `${W}m`)
     },
     []
   )
@@ -753,9 +795,11 @@ export default function EditorPage() {
 
     const colorHex = LINE_COLORS.find((c) => c.value === lineColor)?.hex || '#FFFFFF'
 
-    // Clear existing overlays
+    // Clear existing overlays and dimension labels
     fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
     fieldOverlaysRef.current = []
+    dimensionLabelsRef.current.forEach(label => label.setMap(null))
+    dimensionLabelsRef.current = []
 
     // Generate field lines
     const fieldLines = generateSoccerFieldLines(fieldCenter)
@@ -771,6 +815,35 @@ export default function EditorPage() {
       })
       fieldOverlaysRef.current.push(polyline)
     })
+
+    // Add dimension labels
+    const halfL = fieldLength / 2
+    const halfW = fieldWidth / 2
+    const labelOffset = 8
+
+    const createDimensionLabel = (position: { lat: number; lng: number }, text: string) => {
+      const marker = new google.maps.Marker({
+        position,
+        map: mapRef.current,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 0,
+        },
+        label: {
+          text,
+          color: '#FFFFFF',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          className: 'dimension-label',
+        },
+      })
+      dimensionLabelsRef.current.push(marker)
+    }
+
+    createDimensionLabel(toLatLng(-halfW - labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(halfW + labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(0, halfL + labelOffset), `${fieldWidth}m`)
+    createDimensionLabel(toLatLng(0, -halfL - labelOffset), `${fieldWidth}m`)
 
     // Add draggable marker at center for repositioning
     if (dragMarkerRef.current) {
@@ -1123,6 +1196,8 @@ export default function EditorPage() {
   const handleReset = () => {
     fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
     fieldOverlaysRef.current = []
+    dimensionLabelsRef.current.forEach(label => label.setMap(null))
+    dimensionLabelsRef.current = []
     if (dragMarkerRef.current) {
       dragMarkerRef.current.setMap(null)
       dragMarkerRef.current = null

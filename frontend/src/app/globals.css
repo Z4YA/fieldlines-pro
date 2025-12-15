@@ -127,3 +127,12 @@
   font-size: 13px;
   color: hsl(var(--muted-foreground));
 }
+
+/* Field dimension labels */
+.dimension-label {
+  background-color: rgba(0, 0, 0, 0.75);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  text-shadow: none;
+}
