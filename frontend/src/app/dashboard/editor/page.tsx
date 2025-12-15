@@ -130,6 +130,22 @@ export default function EditorPage() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Prevent scrolling on mobile
+  useEffect(() => {
+    if (isMobile) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.width = '100%'
+      document.body.style.height = '100%'
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.position = ''
+      document.body.style.width = ''
+      document.body.style.height = ''
+    }
+  }, [isMobile])
+
   // Field state
   const [fieldPlaced, setFieldPlaced] = useState(false)
   const [fieldCenter, setFieldCenter] = useState<{ lat: number; lng: number } | null>(null)
