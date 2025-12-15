@@ -457,11 +457,9 @@ export default function EditorPage() {
     (center: { lat: number; lng: number }, length: number, width: number, rot: number, color: string) => {
       if (!mapRef.current) return
 
-      // Clear existing polylines and dimension labels
+      // Clear existing polylines
       fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
       fieldOverlaysRef.current = []
-      dimensionLabelsRef.current.forEach(label => label.setMap(null))
-      dimensionLabelsRef.current = []
 
       const L = length
       const W = width
@@ -589,40 +587,25 @@ export default function EditorPage() {
         fieldOverlaysRef.current.push(polyline)
       })
 
-      // Add dimension labels at edge midpoints
-      const createDimensionLabel = (position: { lat: number; lng: number }, text: string) => {
+      // Update dimension labels
+      dimensionLabelsRef.current.forEach(label => label.setMap(null))
+      dimensionLabelsRef.current = []
+
+      const labelOffset = 8
+      const createLabel = (pos: { lat: number; lng: number }, text: string) => {
         const marker = new google.maps.Marker({
-          position,
+          position: pos,
           map: mapRef.current,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 0,
-          },
-          label: {
-            text,
-            color: '#FFFFFF',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            className: 'dimension-label',
-          },
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 },
+          label: { text, color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold', className: 'dimension-label' },
         })
         dimensionLabelsRef.current.push(marker)
       }
 
-      // Midpoints of edges (offset slightly outward for visibility)
-      const labelOffset = 8 // meters offset from edge
-
-      // Left sideline (length) - offset left
-      createDimensionLabel(toLatLngLocal(-halfW - labelOffset, 0), `${L}m`)
-
-      // Right sideline (length) - offset right
-      createDimensionLabel(toLatLngLocal(halfW + labelOffset, 0), `${L}m`)
-
-      // Top goal line (width) - offset up
-      createDimensionLabel(toLatLngLocal(0, halfL + labelOffset), `${W}m`)
-
-      // Bottom goal line (width) - offset down
-      createDimensionLabel(toLatLngLocal(0, -halfL - labelOffset), `${W}m`)
+      createLabel(toLatLngLocal(-halfW - labelOffset, 0), `${L}m`)
+      createLabel(toLatLngLocal(halfW + labelOffset, 0), `${L}m`)
+      createLabel(toLatLngLocal(0, halfL + labelOffset), `${W}m`)
+      createLabel(toLatLngLocal(0, -halfL - labelOffset), `${W}m`)
     },
     []
   )
@@ -795,11 +778,9 @@ export default function EditorPage() {
 
     const colorHex = LINE_COLORS.find((c) => c.value === lineColor)?.hex || '#FFFFFF'
 
-    // Clear existing overlays and dimension labels
+    // Clear existing overlays
     fieldOverlaysRef.current.forEach(overlay => overlay.setMap(null))
     fieldOverlaysRef.current = []
-    dimensionLabelsRef.current.forEach(label => label.setMap(null))
-    dimensionLabelsRef.current = []
 
     // Generate field lines
     const fieldLines = generateSoccerFieldLines(fieldCenter)
@@ -815,35 +796,6 @@ export default function EditorPage() {
       })
       fieldOverlaysRef.current.push(polyline)
     })
-
-    // Add dimension labels
-    const halfL = fieldLength / 2
-    const halfW = fieldWidth / 2
-    const labelOffset = 8
-
-    const createDimensionLabel = (position: { lat: number; lng: number }, text: string) => {
-      const marker = new google.maps.Marker({
-        position,
-        map: mapRef.current,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 0,
-        },
-        label: {
-          text,
-          color: '#FFFFFF',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          className: 'dimension-label',
-        },
-      })
-      dimensionLabelsRef.current.push(marker)
-    }
-
-    createDimensionLabel(toLatLng(fieldCenter, -halfW - labelOffset, 0), `${fieldLength}m`)
-    createDimensionLabel(toLatLng(fieldCenter, halfW + labelOffset, 0), `${fieldLength}m`)
-    createDimensionLabel(toLatLng(fieldCenter, 0, halfL + labelOffset), `${fieldWidth}m`)
-    createDimensionLabel(toLatLng(fieldCenter, 0, -halfL - labelOffset), `${fieldWidth}m`)
 
     // Add draggable marker at center for repositioning
     if (dragMarkerRef.current) {
@@ -874,6 +826,8 @@ export default function EditorPage() {
     }
 
     // Edge markers for resizing (midpoints of each edge)
+    const halfL = fieldLength / 2
+    const halfW = fieldWidth / 2
     const colorHexForDrag = colorHex
 
     // Use built-in symbol for reliable drag detection
@@ -1163,6 +1117,33 @@ export default function EditorPage() {
         })
       })
     }
+
+    // Dimension labels - clear existing and create new
+    dimensionLabelsRef.current.forEach(label => label.setMap(null))
+    dimensionLabelsRef.current = []
+
+    const labelOffset = 8
+    const createDimensionLabel = (position: { lat: number; lng: number }, text: string) => {
+      const marker = new google.maps.Marker({
+        position,
+        map: mapRef.current,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 },
+        label: {
+          text,
+          color: '#FFFFFF',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          className: 'dimension-label',
+        },
+      })
+      dimensionLabelsRef.current.push(marker)
+    }
+
+    createDimensionLabel(toLatLng(fieldCenter, -halfW - labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(fieldCenter, halfW + labelOffset, 0), `${fieldLength}m`)
+    createDimensionLabel(toLatLng(fieldCenter, 0, halfL + labelOffset), `${fieldWidth}m`)
+    createDimensionLabel(toLatLng(fieldCenter, 0, -halfL - labelOffset), `${fieldWidth}m`)
+
   }, [fieldCenter, fieldPlaced, fieldLength, fieldWidth, lineColor, rotation, isMapLoaded, generateSoccerFieldLines, toLatLng, fromLatLng, selectedTemplate, redrawFieldLines, updateAllMarkerPositions])
 
   // Handle template change
