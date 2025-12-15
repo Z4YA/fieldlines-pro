@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 
@@ -85,6 +86,37 @@ export default function AdminSettingsPage() {
       )}
 
       <div className="space-y-6">
+        {/* Admin Management - Super Admin Only */}
+        {isSuperAdmin && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Admin Management</h2>
+              <p className="text-sm text-gray-500">Manage administrator access to the platform</p>
+            </div>
+            <div className="p-4">
+              <Link
+                href="/dashboard/admin/invitations"
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Invite New Admin</p>
+                    <p className="text-sm text-gray-500">Send invitations to new administrators</p>
+                  </div>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Notification Settings */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b border-gray-200">
