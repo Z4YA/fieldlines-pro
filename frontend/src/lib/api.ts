@@ -736,7 +736,7 @@ class ApiClient {
     return this.request(`/api/admin/templates/${id}`, { method: 'DELETE' })
   }
 
-  // Admin - Invitations
+  // Admin - Admin Invitations
   async getAdminInvitations() {
     return this.request<Array<{
       id: string
@@ -761,6 +761,59 @@ class ApiClient {
 
   async deleteAdminInvitation(id: string) {
     return this.request('/api/admin/invitations/' + id, { method: 'DELETE' })
+  }
+
+  // Admin - User Invitations
+  async getUserInvitations() {
+    return this.request<Array<{
+      id: string
+      email: string
+      token: string
+      expiresAt: string
+      acceptedAt?: string
+      createdAt: string
+      invitedBy: { fullName: string; email: string }
+    }>>('/api/admin/user-invitations')
+  }
+
+  async createUserInvitation(email: string) {
+    return this.request<{
+      message: string
+      invitation: { id: string; email: string; expiresAt: string }
+    }>('/api/admin/user-invitations', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  }
+
+  async deleteUserInvitation(id: string) {
+    return this.request('/api/admin/user-invitations/' + id, { method: 'DELETE' })
+  }
+
+  // User invitation registration
+  async validateUserInvitation(token: string) {
+    return this.request<{
+      valid: boolean
+      email: string
+      invitedBy: string
+      expiresAt: string
+    }>('/api/auth/user/validate-invitation', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    })
+  }
+
+  async registerWithInvitation(data: {
+    token: string
+    fullName: string
+    phone: string
+    password: string
+    organization?: string
+  }) {
+    return this.request<{ message: string; userId: string }>('/api/auth/user/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
   }
 
   // Settings

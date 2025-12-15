@@ -1,20 +1,30 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { register } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+
+  // Invitation state
+  const [invitationToken, setInvitationToken] = useState<string | null>(null)
+  const [invitationEmail, setInvitationEmail] = useState<string | null>(null)
+  const [invitedBy, setInvitedBy] = useState<string | null>(null)
+  const [isValidatingInvitation, setIsValidatingInvitation] = useState(false)
+  const [invitationError, setInvitationError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -24,6 +34,33 @@ export default function RegisterPage() {
     confirmPassword: '',
     acceptTerms: false,
   })
+
+  // Check for invitation token on mount
+  useEffect(() => {
+    const token = searchParams.get('token')
+    if (token) {
+      setInvitationToken(token)
+      validateInvitation(token)
+    }
+  }, [searchParams])
+
+  const validateInvitation = async (token: string) => {
+    setIsValidatingInvitation(true)
+    setInvitationError(null)
+
+    const response = await api.validateUserInvitation(token)
+
+    if (response.error) {
+      setInvitationError(response.error)
+      setInvitationToken(null)
+    } else if (response.data) {
+      setInvitationEmail(response.data.email)
+      setInvitedBy(response.data.invitedBy)
+      setFormData(prev => ({ ...prev, email: response.data!.email }))
+    }
+
+    setIsValidatingInvitation(false)
+  }
 
   const validateForm = () => {
     if (formData.password.length < 8) {
@@ -49,18 +86,36 @@ export default function RegisterPage() {
 
     setIsLoading(true)
 
-    const result = await register({
-      email: formData.email,
-      password: formData.password,
-      fullName: formData.fullName,
-      phone: formData.phone,
-      organization: formData.organization || undefined,
-    })
+    // If registering with invitation token
+    if (invitationToken && invitationEmail) {
+      const response = await api.registerWithInvitation({
+        token: invitationToken,
+        fullName: formData.fullName,
+        phone: formData.phone,
+        password: formData.password,
+        organization: formData.organization || undefined,
+      })
 
-    if (result.success) {
-      setSuccess(true)
+      if (response.error) {
+        setError(response.error)
+      } else {
+        setSuccess(true)
+      }
     } else {
-      setError(result.error || 'Registration failed. Please try again.')
+      // Regular registration
+      const result = await register({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        phone: formData.phone,
+        organization: formData.organization || undefined,
+      })
+
+      if (result.success) {
+        setSuccess(true)
+      } else {
+        setError(result.error || 'Registration failed. Please try again.')
+      }
     }
 
     setIsLoading(false)
@@ -72,6 +127,67 @@ export default function RegisterPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }))
+  }
+
+  // Loading state for invitation validation
+  if (isValidatingInvitation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-600">Validating your invitation...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Invalid invitation error
+  if (invitationError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+            </div>
+            <CardTitle className="text-2xl text-center">Invalid Invitation</CardTitle>
+            <CardDescription className="text-center text-red-600">
+              {invitationError}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-center text-gray-600">
+            <p>
+              The invitation link you used is invalid, expired, or has already been used.
+            </p>
+            <p className="text-sm">
+              Please contact the administrator who sent you the invitation to request a new one.
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push('/register')}
+            >
+              Register without invitation
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => router.push('/login')}
+            >
+              Go to Login
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
   }
 
   if (success) {
@@ -86,25 +202,38 @@ export default function RegisterPage() {
                 </svg>
               </div>
             </div>
-            <CardTitle className="text-2xl text-center">Check your email</CardTitle>
+            <CardTitle className="text-2xl text-center">
+              {invitationToken ? 'Registration Complete!' : 'Check your email'}
+            </CardTitle>
             <CardDescription className="text-center">
-              We&apos;ve sent a verification link to <strong>{formData.email}</strong>
+              {invitationToken ? (
+                'Your account has been created successfully. You can now log in.'
+              ) : (
+                <>We&apos;ve sent a verification link to <strong>{formData.email}</strong></>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-center text-gray-600">
-            <p>
-              Click the link in the email to verify your account and get started with XACTLINE.
-            </p>
-            <p className="text-sm">
-              Didn&apos;t receive the email? Check your spam folder or{' '}
-              <button className="text-green-600 hover:text-green-500 font-medium">
-                click here to resend
-              </button>
-            </p>
+            {invitationToken ? (
+              <p>
+                Welcome to XACTLINE! You can now log in and start using the platform.
+              </p>
+            ) : (
+              <>
+                <p>
+                  Click the link in the email to verify your account and get started with XACTLINE.
+                </p>
+                <p className="text-sm">
+                  Didn&apos;t receive the email? Check your spam folder or{' '}
+                  <button className="text-green-600 hover:text-green-500 font-medium">
+                    click here to resend
+                  </button>
+                </p>
+              </>
+            )}
           </CardContent>
           <CardFooter>
             <Button
-              variant="outline"
               className="w-full"
               onClick={() => router.push('/login')}
             >
@@ -125,9 +254,17 @@ export default function RegisterPage() {
               XACTLINE
             </Link>
           </div>
-          <CardTitle className="text-2xl text-center">Create your account</CardTitle>
+          <CardTitle className="text-2xl text-center">
+            {invitationToken ? 'Complete Your Registration' : 'Create your account'}
+          </CardTitle>
           <CardDescription className="text-center">
-            Get started with professional field line marking
+            {invitationToken && invitedBy ? (
+              <>
+                <span className="font-medium text-green-600">{invitedBy}</span> has invited you to join XACTLINE
+              </>
+            ) : (
+              'Get started with professional field line marking'
+            )}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -137,6 +274,15 @@ export default function RegisterPage() {
                 {error}
               </div>
             )}
+
+            {invitationToken && invitationEmail && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-700">
+                  You are registering with the email: <strong>{invitationEmail}</strong>
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="fullName">Full name</Label>
               <Input
@@ -151,20 +297,24 @@ export default function RegisterPage() {
                 disabled={isLoading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                placeholder="you@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                disabled={isLoading}
-              />
-            </div>
+
+            {!invitationToken && (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="phone">Phone number</Label>
               <Input
@@ -247,7 +397,7 @@ export default function RegisterPage() {
               className="w-full"
               disabled={isLoading}
             >
-              {isLoading ? 'Creating account...' : 'Create account'}
+              {isLoading ? 'Creating account...' : (invitationToken ? 'Complete Registration' : 'Create account')}
             </Button>
             <p className="text-sm text-center text-gray-600">
               Already have an account?{' '}
@@ -259,5 +409,17 @@ export default function RegisterPage() {
         </form>
       </Card>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    }>
+      <RegisterPageContent />
+    </Suspense>
   )
 }

@@ -306,6 +306,129 @@ router.post('/logout', (req: Request, res: Response) => {
   res.json({ message: 'Logout successful' })
 })
 
+// ============ USER INVITATION REGISTRATION ============
+
+const userInviteRegisterSchema = z.object({
+  token: z.string().min(1, 'Invitation token is required'),
+  fullName: z.string().min(1, 'Full name is required'),
+  phone: z.string().min(1, 'Phone number is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  organization: z.string().optional(),
+})
+
+// POST /api/auth/user/validate-invitation - Validate user invitation token
+router.post('/user/validate-invitation', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const invitation = await prisma.userInvitation.findUnique({
+      where: { token },
+      include: {
+        invitedBy: { select: { fullName: true } }
+      }
+    })
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invalid invitation token' })
+    }
+
+    if (invitation.acceptedAt) {
+      return res.status(400).json({ error: 'This invitation has already been used' })
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This invitation has expired' })
+    }
+
+    res.json({
+      valid: true,
+      email: invitation.email,
+      invitedBy: invitation.invitedBy.fullName,
+      expiresAt: invitation.expiresAt
+    })
+  } catch (error) {
+    console.error('Validate user invitation error:', error)
+    res.status(500).json({ error: 'Failed to validate invitation' })
+  }
+})
+
+// POST /api/auth/user/register - Complete user registration with invitation token
+router.post('/user/register', async (req: Request, res: Response) => {
+  try {
+    const validation = userInviteRegisterSchema.safeParse(req.body)
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      })
+    }
+
+    const { token, fullName, phone, password, organization } = validation.data
+
+    // Find and validate invitation
+    const invitation = await prisma.userInvitation.findUnique({
+      where: { token }
+    })
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invalid invitation token' })
+    }
+
+    if (invitation.acceptedAt) {
+      return res.status(400).json({ error: 'This invitation has already been used' })
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'This invitation has expired' })
+    }
+
+    // Check if email is already registered (case-insensitive check)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: invitation.email, mode: 'insensitive' }
+      }
+    })
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'This email is already registered. Please log in instead.' })
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 12)
+
+    // Create user and mark invitation as accepted in a transaction
+    const [user] = await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          email: invitation.email,
+          passwordHash,
+          fullName,
+          phone,
+          organization,
+          role: 'user',
+          emailVerified: true, // User invitations imply verified email
+        },
+      }),
+      prisma.userInvitation.update({
+        where: { id: invitation.id },
+        data: { acceptedAt: new Date() }
+      })
+    ])
+
+    res.status(201).json({
+      message: 'Registration successful. You can now log in.',
+      userId: user.id,
+    })
+  } catch (error) {
+    console.error('User invitation registration error:', error)
+    res.status(500).json({ error: 'Registration failed' })
+  }
+})
+
 // ============ ADMIN REGISTRATION ============
 
 const adminRegisterSchema = z.object({

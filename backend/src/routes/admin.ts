@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { requireAdmin, requireSuperAdmin } from '../middleware/admin.js'
-import { sendAdminInvitationEmail, sendVerificationEmail, sendPasswordResetEmail } from '../services/email.js'
+import { sendAdminInvitationEmail, sendUserInvitationEmail, sendVerificationEmail, sendPasswordResetEmail } from '../services/email.js'
 
 const router = Router()
 
@@ -919,6 +919,129 @@ router.delete('/invitations/:id', requireSuperAdmin, async (req: AuthRequest, re
     res.json({ message: 'Invitation deleted' })
   } catch (error) {
     console.error('Delete invitation error:', error)
+    res.status(500).json({ error: 'Failed to delete invitation' })
+  }
+})
+
+// ============ USER INVITATION MANAGEMENT ============
+
+// GET /api/admin/user-invitations - List all user invitations
+router.get('/user-invitations', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const invitations = await prisma.userInvitation.findMany({
+      include: {
+        invitedBy: { select: { fullName: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    res.json(invitations)
+  } catch (error) {
+    console.error('Get user invitations error:', error)
+    res.status(500).json({ error: 'Failed to get invitations' })
+  }
+})
+
+// POST /api/admin/user-invitations - Create user invitation
+router.post('/user-invitations', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const data = invitationSchema.parse(req.body)
+
+    // Normalize email to lowercase
+    const normalizedEmail = data.email.toLowerCase().trim()
+
+    // Check if email is already registered (case-insensitive)
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
+    })
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'A user with this email already exists' })
+    }
+
+    // Check if user invitation already exists (case-insensitive)
+    const existingUserInvitation = await prisma.userInvitation.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
+    })
+
+    if (existingUserInvitation && !existingUserInvitation.acceptedAt) {
+      return res.status(400).json({ error: 'An invitation for this email already exists' })
+    }
+
+    // Check if admin invitation already exists (case-insensitive)
+    const existingAdminInvitation = await prisma.adminInvitation.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' }
+      }
+    })
+
+    if (existingAdminInvitation && !existingAdminInvitation.acceptedAt) {
+      return res.status(400).json({ error: 'An admin invitation for this email already exists' })
+    }
+
+    // Create invitation token
+    const token = uuidv4()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+
+    // Get inviter name for email
+    const inviter = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { fullName: true }
+    })
+
+    // Create or update invitation (use normalized email)
+    const invitation = await prisma.userInvitation.upsert({
+      where: { email: normalizedEmail },
+      update: {
+        token,
+        expiresAt,
+        invitedById: req.userId!,
+        acceptedAt: null
+      },
+      create: {
+        email: normalizedEmail,
+        token,
+        expiresAt,
+        invitedById: req.userId!
+      }
+    })
+
+    // Send invitation email
+    await sendUserInvitationEmail(normalizedEmail, token, inviter?.fullName || 'Admin')
+
+    res.status(201).json({
+      message: 'Invitation sent successfully',
+      invitation: {
+        id: invitation.id,
+        email: invitation.email,
+        expiresAt: invitation.expiresAt
+      }
+    })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors })
+    }
+    console.error('Create user invitation error:', error)
+    res.status(500).json({ error: 'Failed to create invitation' })
+  }
+})
+
+// DELETE /api/admin/user-invitations/:id - Cancel/delete user invitation
+router.delete('/user-invitations/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    await prisma.userInvitation.delete({
+      where: { id }
+    })
+
+    res.json({ message: 'Invitation deleted' })
+  } catch (error) {
+    console.error('Delete user invitation error:', error)
     res.status(500).json({ error: 'Failed to delete invitation' })
   }
 })

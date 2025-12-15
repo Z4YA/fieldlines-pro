@@ -36,6 +36,7 @@ model User {
   bookings         Booking[]
   bookingGroups    BookingGroup[]
   sentInvitations  AdminInvitation[] @relation("InvitedBy")
+  sentUserInvitations UserInvitation[] @relation("UserInvitedBy")
 
   @@map("users")
 }
@@ -164,6 +165,21 @@ model AdminInvitation {
   invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
 
   @@map("admin_invitations")
+}
+
+model UserInvitation {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  token       String    @unique
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  invitedBy   User      @relation("UserInvitedBy", fields: [invitedById], references: [id])
+
+  @@map("user_invitations")
 }
 
 model SystemSettings {

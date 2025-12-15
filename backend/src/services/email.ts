@@ -422,3 +422,67 @@ export async function sendAdminInvitationEmail(email: string, token: string, inv
     throw error // Re-throw to let the caller handle it
   }
 }
+
+export async function sendUserInvitationEmail(email: string, token: string, inviterName: string) {
+  const inviteUrl = `${FRONTEND_URL}/register?token=${token}`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #16a34a; color: white; padding: 20px; text-align: center; }
+        .content { padding: 30px; background: #f9f9f9; }
+        .button { display: inline-block; padding: 12px 24px; background: #16a34a; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }
+        .highlight { background: #f0fdf4; padding: 15px; border-radius: 6px; border-left: 4px solid #16a34a; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to XACTLINE</h1>
+        </div>
+        <div class="content">
+          <h2>You're Invited!</h2>
+          <p>Hi,</p>
+          <p><strong>${inviterName}</strong> has invited you to join XACTLINE - the sports field line marking platform.</p>
+
+          <div class="highlight">
+            <p><strong>With XACTLINE, you can:</strong></p>
+            <ul>
+              <li>Add and manage your sportsgrounds</li>
+              <li>Design field line configurations</li>
+              <li>Request professional line marking services</li>
+              <li>Track your booking history</li>
+            </ul>
+          </div>
+
+          <p>Click the button below to complete your registration:</p>
+          <a href="${inviteUrl}" class="button">Accept Invitation</a>
+
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>${inviteUrl}</p>
+
+          <p><strong>This invitation will expire in 7 days.</strong></p>
+
+          <p>If you didn't expect this invitation or have questions, please contact the person who invited you.</p>
+        </div>
+        <div class="footer">
+          <p>&copy; ${new Date().getFullYear()} XACTLINE. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+
+  try {
+    await sendEmail(email, 'You are invited to join XACTLINE', html)
+    console.log(`User invitation email sent to ${email}`)
+  } catch (error) {
+    console.error('Failed to send user invitation email:', error)
+    throw error // Re-throw to let the caller handle it
+  }
+}
