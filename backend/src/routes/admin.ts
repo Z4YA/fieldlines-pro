@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { requireAdmin, requireSuperAdmin } from '../middleware/admin.js'
-import { sendAdminInvitationEmail } from '../services/email.js'
+import { sendAdminInvitationEmail, sendVerificationEmail, sendPasswordResetEmail } from '../services/email.js'
 
 const router = Router()
 
@@ -101,6 +101,8 @@ router.get('/users', requireAdmin, async (req: AuthRequest, res: Response) => {
           organization: true,
           role: true,
           emailVerified: true,
+          suspended: true,
+          suspendedAt: true,
           createdAt: true,
           lastLoginAt: true,
           _count: {
@@ -269,6 +271,206 @@ router.put('/users/:id/role', requireAdmin, async (req: AuthRequest, res: Respon
   } catch (error) {
     console.error('Update user role error:', error)
     res.status(500).json({ error: 'Failed to update user role' })
+  }
+})
+
+// PUT /api/admin/users/:id/suspend - Suspend or unsuspend a user
+router.put('/users/:id/suspend', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { suspended } = req.body
+
+    if (typeof suspended !== 'boolean') {
+      return res.status(400).json({ error: 'suspended must be a boolean' })
+    }
+
+    // Cannot suspend yourself
+    if (id === req.userId) {
+      return res.status(400).json({ error: 'Cannot suspend your own account' })
+    }
+
+    // Get current user's role
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true }
+    })
+
+    // Get target user
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true }
+    })
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const isSuperAdmin = currentUser?.role === 'super_admin'
+
+    // Regular admins can only suspend regular users
+    if (!isSuperAdmin && (targetUser.role === 'admin' || targetUser.role === 'super_admin')) {
+      return res.status(403).json({ error: 'You can only suspend regular users' })
+    }
+
+    // Super admins cannot suspend other super admins
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot suspend super admin accounts' })
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        suspended,
+        suspendedAt: suspended ? new Date() : null
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        suspended: true,
+        suspendedAt: true
+      }
+    })
+
+    res.json(user)
+  } catch (error) {
+    console.error('Suspend user error:', error)
+    res.status(500).json({ error: 'Failed to update user suspension status' })
+  }
+})
+
+// POST /api/admin/users/:id/reset-password - Send password reset email to user
+router.post('/users/:id/reset-password', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { email: true, role: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Get current user's role
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true }
+    })
+
+    const isSuperAdmin = currentUser?.role === 'super_admin'
+
+    // Regular admins can only reset passwords for regular users
+    if (!isSuperAdmin && (user.role === 'admin' || user.role === 'super_admin')) {
+      return res.status(403).json({ error: 'You can only reset passwords for regular users' })
+    }
+
+    // Generate reset token
+    const resetToken = uuidv4()
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+    await prisma.user.update({
+      where: { id },
+      data: {
+        resetToken,
+        resetTokenExpiry
+      }
+    })
+
+    // Send reset email
+    await sendPasswordResetEmail(user.email, resetToken)
+
+    res.json({ message: 'Password reset email sent successfully' })
+  } catch (error) {
+    console.error('Admin reset password error:', error)
+    res.status(500).json({ error: 'Failed to send password reset email' })
+  }
+})
+
+// POST /api/admin/users/:id/resend-verification - Resend verification email
+router.post('/users/:id/resend-verification', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { email: true, emailVerified: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ error: 'User email is already verified' })
+    }
+
+    // Generate new verification token
+    const verificationToken = uuidv4()
+
+    await prisma.user.update({
+      where: { id },
+      data: { verificationToken }
+    })
+
+    // Send verification email
+    await sendVerificationEmail(user.email, verificationToken)
+
+    res.json({ message: 'Verification email sent successfully' })
+  } catch (error) {
+    console.error('Resend verification error:', error)
+    res.status(500).json({ error: 'Failed to send verification email' })
+  }
+})
+
+// DELETE /api/admin/users/:id - Delete a user and all their data
+router.delete('/users/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Cannot delete yourself
+    if (id === req.userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' })
+    }
+
+    // Get current user's role
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true }
+    })
+
+    // Get target user
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true, fullName: true, email: true }
+    })
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const isSuperAdmin = currentUser?.role === 'super_admin'
+
+    // Regular admins can only delete regular users
+    if (!isSuperAdmin && (targetUser.role === 'admin' || targetUser.role === 'super_admin')) {
+      return res.status(403).json({ error: 'You can only delete regular users' })
+    }
+
+    // Cannot delete super admins
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot delete super admin accounts' })
+    }
+
+    // Delete user (cascade will handle related records)
+    await prisma.user.delete({
+      where: { id }
+    })
+
+    res.json({ message: 'User deleted successfully', user: { id, fullName: targetUser.fullName, email: targetUser.email } })
+  } catch (error) {
+    console.error('Delete user error:', error)
+    res.status(500).json({ error: 'Failed to delete user' })
   }
 })
 

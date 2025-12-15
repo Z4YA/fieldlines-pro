@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
@@ -12,6 +12,8 @@ interface User {
   phone: string
   role: string
   emailVerified: boolean
+  suspended: boolean
+  suspendedAt: string | null
   createdAt: string
   _count: {
     sportsgrounds: number
@@ -33,6 +35,10 @@ export default function AdminUsersPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<User | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Default to card view on mobile
   useEffect(() => {
@@ -40,6 +46,25 @@ export default function AdminUsersPage() {
       setViewMode('cards')
     }
   }, [])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Auto-hide action message
+  useEffect(() => {
+    if (actionMessage) {
+      const timer = setTimeout(() => setActionMessage(null), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [actionMessage])
 
   const fetchUsers = async () => {
     setIsLoading(true)
@@ -84,6 +109,75 @@ export default function AdminUsersPage() {
     if (isSuperAdmin) return user.role !== 'super_admin'
     // Regular admins can only edit regular users (not admins or super_admins)
     return user.role === 'user'
+  }
+
+  // Check if current user can perform actions on a specific user
+  const canManageUser = (user: User) => {
+    if (!isAdmin) return false
+    // Super admins can manage anyone except other super admins
+    if (isSuperAdmin) return user.role !== 'super_admin'
+    // Regular admins can only manage regular users
+    return user.role === 'user'
+  }
+
+  const handleSuspend = async (user: User) => {
+    setOpenMenuId(null)
+    setUpdatingId(user.id)
+    const response = await api.suspendUser(user.id, !user.suspended)
+    if (response.error) {
+      setActionMessage({ type: 'error', text: response.error })
+    } else {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? { ...u, suspended: !user.suspended, suspendedAt: !user.suspended ? new Date().toISOString() : null }
+            : u
+        )
+      )
+      setActionMessage({
+        type: 'success',
+        text: user.suspended ? `${user.fullName} has been unsuspended` : `${user.fullName} has been suspended`,
+      })
+    }
+    setUpdatingId(null)
+  }
+
+  const handlePasswordReset = async (user: User) => {
+    setOpenMenuId(null)
+    setUpdatingId(user.id)
+    const response = await api.sendPasswordReset(user.id)
+    if (response.error) {
+      setActionMessage({ type: 'error', text: response.error })
+    } else {
+      setActionMessage({ type: 'success', text: `Password reset email sent to ${user.email}` })
+    }
+    setUpdatingId(null)
+  }
+
+  const handleResendVerification = async (user: User) => {
+    setOpenMenuId(null)
+    setUpdatingId(user.id)
+    const response = await api.resendVerificationEmail(user.id)
+    if (response.error) {
+      setActionMessage({ type: 'error', text: response.error })
+    } else {
+      setActionMessage({ type: 'success', text: `Verification email sent to ${user.email}` })
+    }
+    setUpdatingId(null)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteConfirm) return
+    setUpdatingId(deleteConfirm.id)
+    const response = await api.deleteUser(deleteConfirm.id)
+    if (response.error) {
+      setActionMessage({ type: 'error', text: response.error })
+    } else {
+      setUsers((prev) => prev.filter((u) => u.id !== deleteConfirm.id))
+      setActionMessage({ type: 'success', text: `${deleteConfirm.fullName} has been deleted` })
+    }
+    setDeleteConfirm(null)
+    setUpdatingId(null)
   }
 
   const getRoleBadge = (role: string) => {
@@ -154,12 +248,153 @@ export default function AdminUsersPage() {
     )
   }
 
+  const ActionsMenu = ({ user }: { user: User }) => {
+    const isOpen = openMenuId === user.id
+    const canManage = canManageUser(user)
+
+    if (!canManage) {
+      return (
+        <Link
+          href={`/dashboard/admin/users/${user.id}`}
+          className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
+        >
+          View Details
+        </Link>
+      )
+    }
+
+    return (
+      <div className="relative" ref={isOpen ? menuRef : null}>
+        <button
+          onClick={() => setOpenMenuId(isOpen ? null : user.id)}
+          disabled={updatingId === user.id}
+          className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+        >
+          Actions
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {isOpen && (
+          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+            <div className="py-1">
+              <Link
+                href={`/dashboard/admin/users/${user.id}`}
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                View Details
+              </Link>
+              <button
+                onClick={() => handleSuspend(user)}
+                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                {user.suspended ? 'Unsuspend User' : 'Suspend User'}
+              </button>
+              <button
+                onClick={() => handlePasswordReset(user)}
+                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Send Password Reset
+              </button>
+              {!user.emailVerified && (
+                <button
+                  onClick={() => handleResendVerification(user)}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Resend Verification
+                </button>
+              )}
+              <hr className="my-1" />
+              <button
+                onClick={() => {
+                  setOpenMenuId(null)
+                  setDeleteConfirm(user)
+                }}
+                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                Delete User
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const UserStatus = ({ user }: { user: User }) => (
+    <div className="flex flex-col gap-1">
+      {user.suspended ? (
+        <span className="inline-flex items-center text-red-600 text-xs">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+          </svg>
+          Suspended
+        </span>
+      ) : user.emailVerified ? (
+        <span className="inline-flex items-center text-green-600 text-xs">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          Verified
+        </span>
+      ) : (
+        <span className="inline-flex items-center text-yellow-600 text-xs">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          Unverified
+        </span>
+      )}
+    </div>
+  )
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
         <p className="text-gray-600">View and manage platform users</p>
       </div>
+
+      {/* Action Message */}
+      {actionMessage && (
+        <div
+          className={`mb-4 p-3 rounded-lg ${
+            actionMessage.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-700'
+              : 'bg-red-50 border border-red-200 text-red-700'
+          }`}
+        >
+          {actionMessage.text}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete User</h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete <strong>{deleteConfirm.fullName}</strong> ({deleteConfirm.email})?
+              This will permanently remove all their data including sportsgrounds, configurations, and bookings.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={updatingId === deleteConfirm.id}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {updatingId === deleteConfirm.id ? 'Deleting...' : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
@@ -229,12 +464,12 @@ export default function AdminUsersPage() {
         /* Card View */
         <div className="space-y-4">
           {sortedUsers.map((user) => (
-            <div key={user.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
+            <div key={user.id} className={`bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow ${user.suspended ? 'border-l-4 border-red-500' : ''}`}>
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 font-semibold text-lg">
+                    <div className={`w-12 h-12 ${user.suspended ? 'bg-red-100' : 'bg-green-100'} rounded-full flex items-center justify-center`}>
+                      <span className={`${user.suspended ? 'text-red-600' : 'text-green-600'} font-semibold text-lg`}>
                         {user.fullName.charAt(0).toUpperCase()}
                       </span>
                     </div>
@@ -256,21 +491,7 @@ export default function AdminUsersPage() {
                             {formatRole(user.role)}
                           </span>
                         )}
-                        {user.emailVerified ? (
-                          <span className="inline-flex items-center text-green-600 text-xs">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center text-yellow-600 text-xs">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                            Unverified
-                          </span>
-                        )}
+                        <UserStatus user={user} />
                       </div>
                     </div>
                   </div>
@@ -292,12 +513,7 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
                 <div className="flex items-center">
-                  <Link
-                    href={`/dashboard/admin/users/${user.id}`}
-                    className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
-                  >
-                    View Details
-                  </Link>
+                  <ActionsMenu user={user} />
                 </div>
               </div>
             </div>
@@ -360,11 +576,11 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {sortedUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className={`hover:bg-gray-50 ${user.suspended ? 'bg-red-50' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <span className="text-green-600 font-semibold">
+                        <div className={`w-10 h-10 ${user.suspended ? 'bg-red-100' : 'bg-green-100'} rounded-full flex items-center justify-center`}>
+                          <span className={`${user.suspended ? 'text-red-600' : 'text-green-600'} font-semibold`}>
                             {user.fullName.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -398,33 +614,14 @@ export default function AdminUsersPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {user.emailVerified ? (
-                        <span className="inline-flex items-center text-green-600 text-sm">
-                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Verified
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center text-yellow-600 text-sm">
-                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                          Unverified
-                        </span>
-                      )}
+                      <UserStatus user={user} />
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-900">{user._count.sportsgrounds} sportsgrounds</p>
                       <p className="text-sm text-gray-500">{user._count.bookings} bookings</p>
                     </td>
                     <td className="px-6 py-4">
-                      <Link
-                        href={`/dashboard/admin/users/${user.id}`}
-                        className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
-                      >
-                        View Details
-                      </Link>
+                      <ActionsMenu user={user} />
                     </td>
                   </tr>
                 ))}

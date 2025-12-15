@@ -522,6 +522,34 @@ class ApiClient {
     )
   }
 
+  async suspendUser(id: string, suspended: boolean) {
+    return this.request<{ id: string; email: string; fullName: string; suspended: boolean; suspendedAt: string | null }>(
+      `/api/admin/users/${id}/suspend`,
+      { method: 'PUT', body: JSON.stringify({ suspended }) }
+    )
+  }
+
+  async deleteUser(id: string) {
+    return this.request<{ message: string; user: { id: string; fullName: string; email: string } }>(
+      `/api/admin/users/${id}`,
+      { method: 'DELETE' }
+    )
+  }
+
+  async sendPasswordReset(id: string) {
+    return this.request<{ message: string }>(
+      `/api/admin/users/${id}/reset-password`,
+      { method: 'POST' }
+    )
+  }
+
+  async resendVerificationEmail(id: string) {
+    return this.request<{ message: string }>(
+      `/api/admin/users/${id}/resend-verification`,
+      { method: 'POST' }
+    )
+  }
+
   // Admin - Bookings
   async getAdminBookings(params?: { page?: number; limit?: number; status?: string; search?: string }) {
     const query = new URLSearchParams()
