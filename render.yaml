@@ -21,7 +21,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        value: https://fieldlines-pro.vercel.app
+        value: https://manage.xactline.com.au
       - key: NODE_ENV
         value: production
       - key: PORT
