@@ -472,6 +472,8 @@ class ApiClient {
         organization?: string
         role: string
         emailVerified: boolean
+        suspended: boolean
+        suspendedAt: string | null
         createdAt: string
         lastLoginAt?: string
         _count: { sportsgrounds: number; configurations: number; bookings: number }
