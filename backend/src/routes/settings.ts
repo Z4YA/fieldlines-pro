@@ -2,6 +2,7 @@ import { Router, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js'
+import { clearMaintenanceCache } from '../middleware/maintenance.js'
 
 const router = Router()
 
@@ -78,6 +79,11 @@ router.put('/:key', authenticate, requireAdmin, async (req: AuthRequest, res: Re
         updatedBy: req.userId,
       },
     })
+
+    // Clear maintenance cache if maintenance_mode was updated
+    if (key === 'maintenance_mode') {
+      clearMaintenanceCache()
+    }
 
     res.json({ key: setting.key, value: setting.value })
   } catch (error) {

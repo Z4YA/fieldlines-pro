@@ -16,6 +16,10 @@ import bookingRoutes from './routes/bookings.js'
 import adminRoutes from './routes/admin.js'
 import settingsRoutes from './routes/settings.js'
 
+// Import middleware
+import { isMaintenanceModeEnabled, checkMaintenanceMode } from './middleware/maintenance.js'
+import { authenticate, AuthRequest } from './middleware/auth.js'
+
 const app = express()
 const PORT = process.env.PORT || 9501
 
@@ -32,6 +36,37 @@ app.use(express.urlencoded({ extended: true }))
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+// Public maintenance status endpoint (no auth required)
+app.get('/api/maintenance/status', async (req, res) => {
+  const enabled = await isMaintenanceModeEnabled()
+  res.json({ maintenanceMode: enabled })
+})
+
+// Apply maintenance mode check to all subsequent routes
+// This middleware checks if maintenance mode is enabled and blocks non-admin users
+app.use((req: AuthRequest, res, next) => {
+  // First try to authenticate the user (optional, won't fail if no token)
+  const authHeader = req.headers.authorization
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const jwt = require('jsonwebtoken')
+      const token = authHeader.split(' ')[1]
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || 'development-secret'
+      ) as { userId: string; email: string }
+      req.userId = decoded.userId
+      req.userEmail = decoded.email
+    } catch {
+      // Invalid token, continue without auth
+    }
+  }
+  next()
+})
+
+// Apply maintenance mode middleware
+app.use(checkMaintenanceMode)
 
 // API routes
 app.use('/api/auth', authRoutes)

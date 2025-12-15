@@ -10,11 +10,15 @@ export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   // Form state for provider email
   const [providerEmail, setProviderEmail] = useState('')
+
+  // Maintenance mode state
+  const [maintenanceMode, setMaintenanceMode] = useState(false)
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -22,6 +26,7 @@ export default function AdminSettingsPage() {
       if (response.data) {
         setSettings(response.data)
         setProviderEmail(response.data.provider_email || '')
+        setMaintenanceMode(response.data.maintenance_mode === 'true')
       } else if (response.error) {
         setError(response.error)
       }
@@ -29,6 +34,24 @@ export default function AdminSettingsPage() {
     }
     fetchSettings()
   }, [])
+
+  const handleToggleMaintenanceMode = async () => {
+    setError('')
+    setSuccess('')
+    setIsTogglingMaintenance(true)
+
+    const newValue = !maintenanceMode
+    const response = await api.updateSetting('maintenance_mode', newValue ? 'true' : 'false')
+
+    if (response.error) {
+      setError(response.error)
+    } else {
+      setMaintenanceMode(newValue)
+      setSettings({ ...settings, maintenance_mode: newValue ? 'true' : 'false' })
+      setSuccess(`Maintenance mode ${newValue ? 'enabled' : 'disabled'} successfully`)
+    }
+    setIsTogglingMaintenance(false)
+  }
 
   const handleSaveProviderEmail = async () => {
     setError('')
@@ -86,6 +109,55 @@ export default function AdminSettingsPage() {
       )}
 
       <div className="space-y-6">
+        {/* Maintenance Mode */}
+        <div className={`rounded-lg shadow ${maintenanceMode ? 'bg-red-50 border-2 border-red-300' : 'bg-white'}`}>
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Maintenance Mode</h2>
+            <p className="text-sm text-gray-500">Take the platform offline for maintenance</p>
+          </div>
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">
+                  {maintenanceMode ? 'Maintenance Mode is ON' : 'Maintenance Mode is OFF'}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {maintenanceMode
+                    ? 'Regular users cannot access the platform. Only admins and super admins can login.'
+                    : 'The platform is accessible to all users.'}
+                </p>
+              </div>
+              <button
+                onClick={handleToggleMaintenanceMode}
+                disabled={isTogglingMaintenance}
+                className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${
+                  maintenanceMode
+                    ? 'bg-red-600 focus:ring-red-500'
+                    : 'bg-gray-200 focus:ring-orange-500'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    maintenanceMode ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            {maintenanceMode && (
+              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm font-medium text-red-800">
+                    Warning: Users will see a maintenance page and cannot use the platform.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* User Management */}
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b border-gray-200">

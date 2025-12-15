@@ -827,6 +827,11 @@ class ApiClient {
       body: JSON.stringify({ value }),
     })
   }
+
+  // Maintenance mode (public endpoint, no auth required)
+  async getMaintenanceStatus() {
+    return this.request<{ maintenanceMode: boolean }>('/api/maintenance/status')
+  }
 }
 
 export const api = new ApiClient()
