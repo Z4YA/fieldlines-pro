@@ -113,6 +113,22 @@ export default function EditorPage() {
   const [saveError, setSaveError] = useState('')
   const [pendingEditConfigId, setPendingEditConfigId] = useState<string | null>(null)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile and set sidebar state
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (mobile) {
+        setSidebarOpen(false)
+      }
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Field state
   const [fieldPlaced, setFieldPlaced] = useState(false)
@@ -1372,50 +1388,77 @@ export default function EditorPage() {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Top toolbar */}
-      <div className="bg-white border-b px-4 py-2 flex items-center justify-between z-20">
-        <div className="flex items-center space-x-4">
+      <div className="bg-white border-b px-2 md:px-4 py-2 flex items-center justify-between z-20">
+        <div className="flex items-center space-x-2 md:space-x-4 min-w-0">
           <Link href={sportsground ? `/dashboard/sportsgrounds/${sportsground.id}` : '/dashboard/sportsgrounds'}>
-            <Button variant="ghost" size="sm">
-              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <Button variant="ghost" size="sm" className="px-2 md:px-3">
+              <svg className="w-4 h-4 md:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back
+              <span className="hidden md:inline">Back</span>
             </Button>
           </Link>
           {sportsground && (
-            <div>
-              <h1 className="font-semibold text-gray-900">
+            <div className="min-w-0 flex-1">
+              <h1 className="font-semibold text-gray-900 text-sm md:text-base truncate">
                 {sportsground.name}
                 {configurationId && configName && (
-                  <span className="text-green-600 ml-2">— Editing: {configName}</span>
+                  <span className="text-green-600 ml-1 md:ml-2 hidden sm:inline">— Editing: {configName}</span>
                 )}
                 {!configurationId && (
-                  <span className="text-blue-600 ml-2">— New Configuration</span>
+                  <span className="text-blue-600 ml-1 md:ml-2 hidden sm:inline">— New</span>
                 )}
               </h1>
-              <p className="text-xs text-gray-500">{sportsground.address}</p>
+              <p className="text-xs text-gray-500 truncate hidden md:block">{sportsground.address}</p>
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={handleReset} className="px-2 md:px-3">
+            <svg className="w-4 h-4 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Reset
+            <span className="hidden md:inline">Reset</span>
           </Button>
-          <Button size="sm" onClick={() => setShowSaveModal(true)} disabled={!fieldPlaced}>
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <Button size="sm" onClick={() => setShowSaveModal(true)} disabled={!fieldPlaced} className="px-2 md:px-3">
+            <svg className="w-4 h-4 md:mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
-            Save Configuration
+            <span className="hidden md:inline">Save Configuration</span>
+            <span className="md:hidden">Save</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 relative">
+        {/* Mobile overlay */}
+        {isMobile && sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Left control panel */}
-        <div className="w-80 bg-white border-r overflow-y-auto z-10">
+        <div
+          className={`
+            ${isMobile ? 'fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out' : 'relative'}
+            ${isMobile && !sidebarOpen ? '-translate-x-full' : 'translate-x-0'}
+            w-80 max-w-[85vw] bg-white border-r overflow-y-auto
+            ${isMobile ? 'pt-16 shadow-xl' : ''}
+          `}
+        >
+          {/* Mobile close button */}
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-2 right-2 p-2 rounded-full hover:bg-gray-100 z-50"
+            >
+              <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
           <div className="p-4 space-y-6">
             {/* Instructions */}
             {!fieldPlaced && (
@@ -1629,8 +1672,40 @@ export default function EditorPage() {
 
           {/* Placement hint overlay */}
           {!fieldPlaced && isMapLoaded && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg text-sm z-10">
-              Click on the map to place your field
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm z-10 text-center max-w-[90%]">
+              {isMobile ? 'Tap on the map to place your field' : 'Click on the map to place your field'}
+            </div>
+          )}
+
+          {/* Mobile floating button to open controls */}
+          {isMobile && !sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="absolute bottom-4 left-4 z-20 bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 active:bg-green-800"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+            </button>
+          )}
+
+          {/* Mobile controls legend (compact version) */}
+          {isMobile && fieldPlaced && !sidebarOpen && (
+            <div className="absolute top-4 left-4 z-10 bg-white bg-opacity-90 rounded-lg p-2 shadow text-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                  <span>Move</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                  <span>Resize</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                  <span>Rotate</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
