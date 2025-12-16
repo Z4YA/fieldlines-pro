@@ -1002,16 +1002,17 @@ router.put('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Re
     // Verify configuration exists
     const existing = await prisma.fieldConfiguration.findUnique({
       where: { id },
-      include: { template: true }
+      include: { template: true, user: { select: { id: true } } }
     })
     if (!existing) {
       return res.status(404).json({ error: 'Configuration not found' })
     }
 
     // If transferring ownership, verify new user exists
-    if (data.userId && data.userId !== existing.userId) {
+    if (data.userId && data.userId !== existing.user.id) {
       const newUser = await prisma.user.findUnique({ where: { id: data.userId } })
       if (!newUser) {
+        console.error('User not found for transfer:', { providedUserId: data.userId, existingUserId: existing.user.id })
         return res.status(404).json({ error: 'New owner user not found' })
       }
     }

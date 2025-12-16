@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef } from 'react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 
 interface Sportsground {
@@ -40,7 +41,6 @@ export default function AdminSportsgroundsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showTransferModal, setShowTransferModal] = useState(false)
@@ -163,38 +163,6 @@ export default function AdminSportsgroundsPage() {
       notes: ''
     })
     setError('')
-  }
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setIsSubmitting(true)
-
-    if (!formData.userId) {
-      setError('Please select a user')
-      setIsSubmitting(false)
-      return
-    }
-
-    const response = await api.createAdminSportsground({
-      userId: formData.userId,
-      name: formData.name,
-      address: formData.address,
-      latitude: formData.latitude,
-      longitude: formData.longitude,
-      defaultZoom: formData.defaultZoom,
-      notes: formData.notes || undefined
-    })
-
-    if (response.error) {
-      setError(response.error)
-    } else {
-      setSuccess('Sportsground created successfully')
-      setShowCreateModal(false)
-      resetForm()
-      fetchSportsgrounds()
-    }
-    setIsSubmitting(false)
   }
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -359,15 +327,15 @@ export default function AdminSportsgroundsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Sportsgrounds</h1>
           <p className="text-gray-600">Manage all sportsgrounds on the platform</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowCreateModal(true) }}
+        <Link
+          href="/dashboard/admin/sportsgrounds/new"
           className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Sportsground
-        </button>
+        </Link>
       </div>
 
       {/* Success/Error Messages */}
@@ -581,116 +549,6 @@ export default function AdminSportsgroundsPage() {
             >
               Next
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Sportsground</h3>
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assign to User *</label>
-                <select
-                  value={formData.userId}
-                  onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  required
-                >
-                  <option value="">Select a user...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.fullName} ({u.email})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Latitude *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Longitude *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Default Zoom (1-22)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="22"
-                  value={formData.defaultZoom}
-                  onChange={(e) => setFormData({ ...formData, defaultZoom: parseInt(e.target.value) || 18 })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  rows={3}
-                />
-              </div>
-              <div className="flex gap-3 justify-end pt-4">
-                <button
-                  type="button"
-                  onClick={() => { setShowCreateModal(false); resetForm() }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Sportsground'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
