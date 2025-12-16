@@ -629,7 +629,7 @@ router.get('/sportsgrounds', requireAdmin, async (req: AuthRequest, res: Respons
       prisma.sportsground.findMany({
         where,
         include: {
-          user: { select: { id: true, fullName: true, email: true } },
+          user: { select: { id: true, fullName: true, email: true, organization: true } },
           _count: { select: { configurations: true } }
         },
         orderBy: { createdAt: 'desc' },
@@ -845,7 +845,7 @@ router.get('/configurations', requireAdmin, async (req: AuthRequest, res: Respon
       prisma.fieldConfiguration.findMany({
         where,
         include: {
-          user: { select: { id: true, fullName: true, email: true } },
+          user: { select: { id: true, fullName: true, email: true, organization: true } },
           sportsground: { select: { id: true, name: true, address: true } },
           template: { select: { id: true, name: true, sport: true } },
           _count: { select: { bookings: true } }

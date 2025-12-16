@@ -13,6 +13,7 @@ interface Configuration {
     id: string
     fullName: string
     email: string
+    organization: string | null
   }
   sportsground: {
     id: string
@@ -35,7 +36,7 @@ interface User {
   email: string
 }
 
-type SortField = 'name' | 'sportsground' | 'template' | 'owner' | 'bookings' | 'createdAt'
+type SortField = 'name' | 'sportsground' | 'template' | 'owner' | 'organization' | 'bookings' | 'createdAt'
 type SortDirection = 'asc' | 'desc'
 
 export default function AdminConfigurationsPage() {
@@ -163,6 +164,9 @@ export default function AdminConfigurationsPage() {
           break
         case 'owner':
           comparison = a.user.fullName.localeCompare(b.user.fullName)
+          break
+        case 'organization':
+          comparison = (a.user.organization || '').localeCompare(b.user.organization || '')
           break
         case 'bookings':
           comparison = a._count.bookings - b._count.bookings
@@ -435,7 +439,7 @@ export default function AdminConfigurationsPage() {
                       {config._count.bookings} booking{config._count.bookings !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Sportsground</p>
                       <Link
@@ -455,6 +459,10 @@ export default function AdminConfigurationsPage() {
                       <p className="text-gray-500">Owner</p>
                       <p className="text-gray-900">{config.user.fullName}</p>
                       <p className="text-gray-600 text-xs">{config.user.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Organization</p>
+                      <p className="text-gray-900">{config.user.organization || <span className="text-gray-400 italic">Not set</span>}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Created</p>
@@ -514,6 +522,15 @@ export default function AdminConfigurationsPage() {
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('organization')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Organization
+                      <SortIcon field="organization" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('bookings')}
                   >
                     <div className="flex items-center gap-1">
@@ -557,6 +574,13 @@ export default function AdminConfigurationsPage() {
                     <td className="px-6 py-4">
                       <p className="text-gray-900">{config.user.fullName}</p>
                       <p className="text-sm text-gray-500">{config.user.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {config.user.organization ? (
+                        <p className="text-gray-900">{config.user.organization}</p>
+                      ) : (
+                        <p className="text-gray-400 italic">Not set</p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">

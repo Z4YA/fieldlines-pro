@@ -15,6 +15,7 @@ interface Sportsground {
     id: string
     fullName: string
     email: string
+    organization: string | null
   }
   _count: {
     configurations: number
@@ -27,7 +28,7 @@ interface User {
   email: string
 }
 
-type SortField = 'name' | 'owner' | 'configurations' | 'createdAt'
+type SortField = 'name' | 'owner' | 'organization' | 'configurations' | 'createdAt'
 type SortDirection = 'asc' | 'desc'
 
 export default function AdminSportsgroundsPage() {
@@ -140,6 +141,9 @@ export default function AdminSportsgroundsPage() {
           break
         case 'owner':
           comparison = a.user.fullName.localeCompare(b.user.fullName)
+          break
+        case 'organization':
+          comparison = (a.user.organization || '').localeCompare(b.user.organization || '')
           break
         case 'configurations':
           comparison = a._count.configurations - b._count.configurations
@@ -415,11 +419,15 @@ export default function AdminSportsgroundsPage() {
                       <p className="text-sm text-gray-500">{sg.address}</p>
                     </div>
                   </div>
-                  <div className="grid md:grid-cols-3 gap-4 text-sm">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Owner</p>
                       <p className="text-gray-900">{sg.user.fullName}</p>
                       <p className="text-gray-600 text-xs">{sg.user.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Organization</p>
+                      <p className="text-gray-900">{sg.user.organization || <span className="text-gray-400 italic">Not set</span>}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Configurations</p>
@@ -476,6 +484,15 @@ export default function AdminSportsgroundsPage() {
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('organization')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Organization
+                      <SortIcon field="organization" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('configurations')}
                   >
                     <div className="flex items-center gap-1">
@@ -517,6 +534,13 @@ export default function AdminSportsgroundsPage() {
                     <td className="px-6 py-4">
                       <p className="text-gray-900">{sg.user.fullName}</p>
                       <p className="text-sm text-gray-500">{sg.user.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {sg.user.organization ? (
+                        <p className="text-gray-900">{sg.user.organization}</p>
+                      ) : (
+                        <p className="text-gray-400 italic">Not set</p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {sg._count.configurations > 0 ? (
