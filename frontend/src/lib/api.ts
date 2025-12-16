@@ -649,6 +649,75 @@ class ApiClient {
     }>(`/api/admin/sportsgrounds${queryString ? `?${queryString}` : ''}`)
   }
 
+  async getAdminSportsground(id: string) {
+    return this.request<{
+      id: string
+      name: string
+      address: string
+      latitude: number
+      longitude: number
+      defaultZoom: number
+      notes?: string
+      createdAt: string
+      user: { id: string; fullName: string; email: string }
+      configurations: Array<{
+        id: string
+        name: string
+        template: { id: string; name: string; sport: string }
+      }>
+    }>(`/api/admin/sportsgrounds/${id}`)
+  }
+
+  async createAdminSportsground(data: {
+    userId: string
+    name: string
+    address: string
+    latitude: number
+    longitude: number
+    defaultZoom?: number
+    notes?: string
+  }) {
+    return this.request<{
+      id: string
+      name: string
+      address: string
+      latitude: number
+      longitude: number
+      user: { id: string; fullName: string; email: string }
+      _count: { configurations: number }
+    }>('/api/admin/sportsgrounds', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateAdminSportsground(id: string, data: Partial<{
+    userId: string
+    name: string
+    address: string
+    latitude: number
+    longitude: number
+    defaultZoom: number
+    notes: string
+  }>) {
+    return this.request<{
+      id: string
+      name: string
+      address: string
+      latitude: number
+      longitude: number
+      user: { id: string; fullName: string; email: string }
+      _count: { configurations: number }
+    }>(`/api/admin/sportsgrounds/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteAdminSportsground(id: string) {
+    return this.request<{ message: string }>(`/api/admin/sportsgrounds/${id}`, { method: 'DELETE' })
+  }
+
   // Admin - Configurations
   async getAdminConfigurations(params?: { page?: number; limit?: number; search?: string }) {
     const query = new URLSearchParams()
@@ -672,6 +741,94 @@ class ApiClient {
       }>
       pagination: { page: number; limit: number; total: number; pages: number }
     }>(`/api/admin/configurations${queryString ? `?${queryString}` : ''}`)
+  }
+
+  async getAdminConfiguration(id: string) {
+    return this.request<{
+      id: string
+      name: string
+      coordinates: { lat: number; lng: number }
+      rotation: number
+      dimensions: { length: number; width: number }
+      lineColor: string
+      createdAt: string
+      user: { id: string; fullName: string; email: string }
+      sportsground: { id: string; name: string; address: string; userId: string }
+      template: {
+        id: string
+        name: string
+        sport: string
+        minLength: number
+        maxLength: number
+        minWidth: number
+        maxWidth: number
+        defaultLength: number
+        defaultWidth: number
+      }
+      _count: { bookings: number }
+    }>(`/api/admin/configurations/${id}`)
+  }
+
+  async createAdminConfiguration(data: {
+    userId: string
+    sportsgroundId: string
+    templateId: string
+    name: string
+    coordinates: { lat: number; lng: number }
+    rotation?: number
+    dimensions: { length: number; width: number }
+    lineColor?: string
+  }) {
+    return this.request<{
+      id: string
+      name: string
+      user: { id: string; fullName: string; email: string }
+      sportsground: { id: string; name: string; address: string }
+      template: { id: string; name: string; sport: string }
+      _count: { bookings: number }
+    }>('/api/admin/configurations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateAdminConfiguration(id: string, data: Partial<{
+    userId: string
+    sportsgroundId: string
+    templateId: string
+    name: string
+    coordinates: { lat: number; lng: number }
+    rotation: number
+    dimensions: { length: number; width: number }
+    lineColor: string
+  }>) {
+    return this.request<{
+      id: string
+      name: string
+      user: { id: string; fullName: string; email: string }
+      sportsground: { id: string; name: string; address: string }
+      template: { id: string; name: string; sport: string }
+      _count: { bookings: number }
+    }>(`/api/admin/configurations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteAdminConfiguration(id: string) {
+    return this.request<{ message: string }>(`/api/admin/configurations/${id}`, { method: 'DELETE' })
+  }
+
+  // Admin - Get users list for dropdowns (simplified)
+  async getAdminUsersSimple() {
+    return this.request<{
+      users: Array<{
+        id: string
+        fullName: string
+        email: string
+      }>
+      pagination: { page: number; limit: number; total: number; pages: number }
+    }>('/api/admin/users?limit=1000')
   }
 
   // Admin - Templates (CRUD)

@@ -654,6 +654,168 @@ router.get('/sportsgrounds', requireAdmin, async (req: AuthRequest, res: Respons
   }
 })
 
+// GET /api/admin/sportsgrounds/:id - Get single sportsground with details
+router.get('/sportsgrounds/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const sportsground = await prisma.sportsground.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        configurations: {
+          include: {
+            template: { select: { id: true, name: true, sport: true } }
+          }
+        }
+      }
+    })
+
+    if (!sportsground) {
+      return res.status(404).json({ error: 'Sportsground not found' })
+    }
+
+    res.json(sportsground)
+  } catch (error) {
+    console.error('Get admin sportsground error:', error)
+    res.status(500).json({ error: 'Failed to get sportsground' })
+  }
+})
+
+const adminSportsgroundSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string().min(1, 'Name is required'),
+  address: z.string().min(1, 'Address is required'),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  defaultZoom: z.number().min(1).max(22).optional(),
+  notes: z.string().optional()
+})
+
+// POST /api/admin/sportsgrounds - Create sportsground for a user
+router.post('/sportsgrounds', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const data = adminSportsgroundSchema.parse(req.body)
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({ where: { id: data.userId } })
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const sportsground = await prisma.sportsground.create({
+      data: {
+        userId: data.userId,
+        name: data.name,
+        address: data.address,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        defaultZoom: data.defaultZoom || 18,
+        notes: data.notes
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        _count: { select: { configurations: true } }
+      }
+    })
+
+    res.status(201).json(sportsground)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message })
+    }
+    console.error('Create admin sportsground error:', error)
+    res.status(500).json({ error: 'Failed to create sportsground' })
+  }
+})
+
+const adminSportsgroundUpdateSchema = z.object({
+  userId: z.string().uuid().optional(),
+  name: z.string().min(1).optional(),
+  address: z.string().min(1).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  defaultZoom: z.number().min(1).max(22).optional(),
+  notes: z.string().optional()
+})
+
+// PUT /api/admin/sportsgrounds/:id - Update sportsground (including ownership transfer)
+router.put('/sportsgrounds/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const data = adminSportsgroundUpdateSchema.parse(req.body)
+
+    // Verify sportsground exists
+    const existing = await prisma.sportsground.findUnique({ where: { id } })
+    if (!existing) {
+      return res.status(404).json({ error: 'Sportsground not found' })
+    }
+
+    // If transferring ownership, verify new user exists
+    if (data.userId && data.userId !== existing.userId) {
+      const newUser = await prisma.user.findUnique({ where: { id: data.userId } })
+      if (!newUser) {
+        return res.status(404).json({ error: 'New owner user not found' })
+      }
+
+      // Also transfer all configurations on this sportsground to the new owner
+      await prisma.fieldConfiguration.updateMany({
+        where: { sportsgroundId: id },
+        data: { userId: data.userId }
+      })
+    }
+
+    const sportsground = await prisma.sportsground.update({
+      where: { id },
+      data: {
+        userId: data.userId,
+        name: data.name,
+        address: data.address,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        defaultZoom: data.defaultZoom,
+        notes: data.notes
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        _count: { select: { configurations: true } }
+      }
+    })
+
+    res.json(sportsground)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message })
+    }
+    console.error('Update admin sportsground error:', error)
+    res.status(500).json({ error: 'Failed to update sportsground' })
+  }
+})
+
+// DELETE /api/admin/sportsgrounds/:id - Delete sportsground
+router.delete('/sportsgrounds/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Verify sportsground exists
+    const existing = await prisma.sportsground.findUnique({
+      where: { id },
+      include: { _count: { select: { configurations: true } } }
+    })
+    if (!existing) {
+      return res.status(404).json({ error: 'Sportsground not found' })
+    }
+
+    // Delete sportsground (configurations will cascade delete)
+    await prisma.sportsground.delete({ where: { id } })
+
+    res.json({ message: 'Sportsground deleted successfully' })
+  } catch (error) {
+    console.error('Delete admin sportsground error:', error)
+    res.status(500).json({ error: 'Failed to delete sportsground' })
+  }
+})
+
 // ============ CONFIGURATION MANAGEMENT ============
 
 // GET /api/admin/configurations - List all configurations
@@ -701,6 +863,245 @@ router.get('/configurations', requireAdmin, async (req: AuthRequest, res: Respon
   } catch (error) {
     console.error('Get admin configurations error:', error)
     res.status(500).json({ error: 'Failed to get configurations' })
+  }
+})
+
+// GET /api/admin/configurations/:id - Get single configuration with details
+router.get('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const configuration = await prisma.fieldConfiguration.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        sportsground: { select: { id: true, name: true, address: true, userId: true } },
+        template: true,
+        _count: { select: { bookings: true } }
+      }
+    })
+
+    if (!configuration) {
+      return res.status(404).json({ error: 'Configuration not found' })
+    }
+
+    res.json(configuration)
+  } catch (error) {
+    console.error('Get admin configuration error:', error)
+    res.status(500).json({ error: 'Failed to get configuration' })
+  }
+})
+
+const adminConfigurationSchema = z.object({
+  userId: z.string().uuid(),
+  sportsgroundId: z.string().uuid(),
+  templateId: z.string().uuid(),
+  name: z.string().min(1, 'Name is required'),
+  coordinates: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }),
+  rotation: z.number().min(0).max(360).default(0),
+  dimensions: z.object({
+    length: z.number().positive(),
+    width: z.number().positive()
+  }),
+  lineColor: z.string().optional()
+})
+
+// POST /api/admin/configurations - Create configuration for a user
+router.post('/configurations', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const data = adminConfigurationSchema.parse(req.body)
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({ where: { id: data.userId } })
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Verify sportsground exists
+    const sportsground = await prisma.sportsground.findUnique({ where: { id: data.sportsgroundId } })
+    if (!sportsground) {
+      return res.status(404).json({ error: 'Sportsground not found' })
+    }
+
+    // Verify template exists and is active
+    const template = await prisma.fieldTemplate.findUnique({ where: { id: data.templateId } })
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' })
+    }
+    if (!template.isActive) {
+      return res.status(400).json({ error: 'Template is not active' })
+    }
+
+    // Validate dimensions against template constraints
+    if (data.dimensions.length < template.minLength || data.dimensions.length > template.maxLength) {
+      return res.status(400).json({
+        error: `Length must be between ${template.minLength}m and ${template.maxLength}m`
+      })
+    }
+    if (data.dimensions.width < template.minWidth || data.dimensions.width > template.maxWidth) {
+      return res.status(400).json({
+        error: `Width must be between ${template.minWidth}m and ${template.maxWidth}m`
+      })
+    }
+
+    const configuration = await prisma.fieldConfiguration.create({
+      data: {
+        userId: data.userId,
+        sportsgroundId: data.sportsgroundId,
+        templateId: data.templateId,
+        name: data.name,
+        coordinates: data.coordinates,
+        rotation: data.rotation,
+        dimensions: data.dimensions,
+        lineColor: data.lineColor || '#FFFFFF'
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        sportsground: { select: { id: true, name: true, address: true } },
+        template: { select: { id: true, name: true, sport: true } },
+        _count: { select: { bookings: true } }
+      }
+    })
+
+    res.status(201).json(configuration)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message })
+    }
+    console.error('Create admin configuration error:', error)
+    res.status(500).json({ error: 'Failed to create configuration' })
+  }
+})
+
+const adminConfigurationUpdateSchema = z.object({
+  userId: z.string().uuid().optional(),
+  sportsgroundId: z.string().uuid().optional(),
+  templateId: z.string().uuid().optional(),
+  name: z.string().min(1).optional(),
+  coordinates: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional(),
+  rotation: z.number().min(0).max(360).optional(),
+  dimensions: z.object({
+    length: z.number().positive(),
+    width: z.number().positive()
+  }).optional(),
+  lineColor: z.string().optional()
+})
+
+// PUT /api/admin/configurations/:id - Update configuration (including ownership transfer)
+router.put('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const data = adminConfigurationUpdateSchema.parse(req.body)
+
+    // Verify configuration exists
+    const existing = await prisma.fieldConfiguration.findUnique({
+      where: { id },
+      include: { template: true }
+    })
+    if (!existing) {
+      return res.status(404).json({ error: 'Configuration not found' })
+    }
+
+    // If transferring ownership, verify new user exists
+    if (data.userId && data.userId !== existing.userId) {
+      const newUser = await prisma.user.findUnique({ where: { id: data.userId } })
+      if (!newUser) {
+        return res.status(404).json({ error: 'New owner user not found' })
+      }
+    }
+
+    // If changing sportsground, verify it exists
+    if (data.sportsgroundId && data.sportsgroundId !== existing.sportsgroundId) {
+      const sportsground = await prisma.sportsground.findUnique({ where: { id: data.sportsgroundId } })
+      if (!sportsground) {
+        return res.status(404).json({ error: 'Sportsground not found' })
+      }
+    }
+
+    // If changing template, verify it exists and is active
+    let template = existing.template
+    if (data.templateId && data.templateId !== existing.templateId) {
+      const newTemplate = await prisma.fieldTemplate.findUnique({ where: { id: data.templateId } })
+      if (!newTemplate) {
+        return res.status(404).json({ error: 'Template not found' })
+      }
+      if (!newTemplate.isActive) {
+        return res.status(400).json({ error: 'Template is not active' })
+      }
+      template = newTemplate
+    }
+
+    // Validate dimensions if provided
+    if (data.dimensions) {
+      if (data.dimensions.length < template.minLength || data.dimensions.length > template.maxLength) {
+        return res.status(400).json({
+          error: `Length must be between ${template.minLength}m and ${template.maxLength}m`
+        })
+      }
+      if (data.dimensions.width < template.minWidth || data.dimensions.width > template.maxWidth) {
+        return res.status(400).json({
+          error: `Width must be between ${template.minWidth}m and ${template.maxWidth}m`
+        })
+      }
+    }
+
+    const configuration = await prisma.fieldConfiguration.update({
+      where: { id },
+      data: {
+        userId: data.userId,
+        sportsgroundId: data.sportsgroundId,
+        templateId: data.templateId,
+        name: data.name,
+        coordinates: data.coordinates,
+        rotation: data.rotation,
+        dimensions: data.dimensions,
+        lineColor: data.lineColor
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        sportsground: { select: { id: true, name: true, address: true } },
+        template: { select: { id: true, name: true, sport: true } },
+        _count: { select: { bookings: true } }
+      }
+    })
+
+    res.json(configuration)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message })
+    }
+    console.error('Update admin configuration error:', error)
+    res.status(500).json({ error: 'Failed to update configuration' })
+  }
+})
+
+// DELETE /api/admin/configurations/:id - Delete configuration
+router.delete('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Verify configuration exists
+    const existing = await prisma.fieldConfiguration.findUnique({
+      where: { id },
+      include: { _count: { select: { bookings: true } } }
+    })
+    if (!existing) {
+      return res.status(404).json({ error: 'Configuration not found' })
+    }
+
+    // Delete configuration (bookings will cascade delete)
+    await prisma.fieldConfiguration.delete({ where: { id } })
+
+    res.json({ message: 'Configuration deleted successfully' })
+  } catch (error) {
+    console.error('Delete admin configuration error:', error)
+    res.status(500).json({ error: 'Failed to delete configuration' })
   }
 })
 
