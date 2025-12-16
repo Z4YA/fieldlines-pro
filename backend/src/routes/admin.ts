@@ -1002,12 +1002,23 @@ router.put('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Re
       return res.status(404).json({ error: 'Configuration not found' })
     }
 
-    // If transferring ownership, verify new user exists
+    // If transferring ownership, verify new user exists and owns the sportsground
     if (data.userId && data.userId !== existing.user.id) {
       const newUser = await prisma.user.findUnique({ where: { id: data.userId } })
       if (!newUser) {
         console.error('User not found for transfer:', { providedUserId: data.userId, existingUserId: existing.user.id })
         return res.status(404).json({ error: 'New owner user not found' })
+      }
+
+      // Check if new user owns the sportsground this configuration is on
+      const sportsground = await prisma.sportsground.findUnique({
+        where: { id: existing.sportsgroundId },
+        select: { userId: true }
+      })
+      if (sportsground && sportsground.userId !== data.userId) {
+        return res.status(400).json({
+          error: 'Cannot transfer configuration to a user who does not own the sportsground. Transfer the sportsground first.'
+        })
       }
     }
 
