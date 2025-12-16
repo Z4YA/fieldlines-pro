@@ -897,15 +897,11 @@ const adminConfigurationSchema = z.object({
   sportsgroundId: z.string().uuid(),
   templateId: z.string().uuid(),
   name: z.string().min(1, 'Name is required'),
-  coordinates: z.object({
-    lat: z.number(),
-    lng: z.number()
-  }),
-  rotation: z.number().min(0).max(360).default(0),
-  dimensions: z.object({
-    length: z.number().positive(),
-    width: z.number().positive()
-  }),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  rotationDegrees: z.number().min(0).max(360).default(0),
+  lengthMeters: z.number().positive(),
+  widthMeters: z.number().positive(),
   lineColor: z.string().optional()
 })
 
@@ -936,12 +932,12 @@ router.post('/configurations', requireAdmin, async (req: AuthRequest, res: Respo
     }
 
     // Validate dimensions against template constraints
-    if (data.dimensions.length < template.minLength || data.dimensions.length > template.maxLength) {
+    if (data.lengthMeters < template.minLength || data.lengthMeters > template.maxLength) {
       return res.status(400).json({
         error: `Length must be between ${template.minLength}m and ${template.maxLength}m`
       })
     }
-    if (data.dimensions.width < template.minWidth || data.dimensions.width > template.maxWidth) {
+    if (data.widthMeters < template.minWidth || data.widthMeters > template.maxWidth) {
       return res.status(400).json({
         error: `Width must be between ${template.minWidth}m and ${template.maxWidth}m`
       })
@@ -953,9 +949,11 @@ router.post('/configurations', requireAdmin, async (req: AuthRequest, res: Respo
         sportsgroundId: data.sportsgroundId,
         templateId: data.templateId,
         name: data.name,
-        coordinates: data.coordinates,
-        rotation: data.rotation,
-        dimensions: data.dimensions,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        rotationDegrees: data.rotationDegrees,
+        lengthMeters: data.lengthMeters,
+        widthMeters: data.widthMeters,
         lineColor: data.lineColor || '#FFFFFF'
       },
       include: {
@@ -981,15 +979,11 @@ const adminConfigurationUpdateSchema = z.object({
   sportsgroundId: z.string().uuid().optional(),
   templateId: z.string().uuid().optional(),
   name: z.string().min(1).optional(),
-  coordinates: z.object({
-    lat: z.number(),
-    lng: z.number()
-  }).optional(),
-  rotation: z.number().min(0).max(360).optional(),
-  dimensions: z.object({
-    length: z.number().positive(),
-    width: z.number().positive()
-  }).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+  rotationDegrees: z.number().min(0).max(360).optional(),
+  lengthMeters: z.number().positive().optional(),
+  widthMeters: z.number().positive().optional(),
   lineColor: z.string().optional()
 })
 
@@ -1039,13 +1033,15 @@ router.put('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Re
     }
 
     // Validate dimensions if provided
-    if (data.dimensions) {
-      if (data.dimensions.length < template.minLength || data.dimensions.length > template.maxLength) {
+    if (data.lengthMeters !== undefined) {
+      if (data.lengthMeters < template.minLength || data.lengthMeters > template.maxLength) {
         return res.status(400).json({
           error: `Length must be between ${template.minLength}m and ${template.maxLength}m`
         })
       }
-      if (data.dimensions.width < template.minWidth || data.dimensions.width > template.maxWidth) {
+    }
+    if (data.widthMeters !== undefined) {
+      if (data.widthMeters < template.minWidth || data.widthMeters > template.maxWidth) {
         return res.status(400).json({
           error: `Width must be between ${template.minWidth}m and ${template.maxWidth}m`
         })
@@ -1059,9 +1055,11 @@ router.put('/configurations/:id', requireAdmin, async (req: AuthRequest, res: Re
         sportsgroundId: data.sportsgroundId,
         templateId: data.templateId,
         name: data.name,
-        coordinates: data.coordinates,
-        rotation: data.rotation,
-        dimensions: data.dimensions,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        rotationDegrees: data.rotationDegrees,
+        lengthMeters: data.lengthMeters,
+        widthMeters: data.widthMeters,
         lineColor: data.lineColor
       },
       include: {

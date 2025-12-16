@@ -747,9 +747,11 @@ class ApiClient {
     return this.request<{
       id: string
       name: string
-      coordinates: { lat: number; lng: number }
-      rotation: number
-      dimensions: { length: number; width: number }
+      latitude: number
+      longitude: number
+      rotationDegrees: number
+      lengthMeters: number
+      widthMeters: number
       lineColor: string
       createdAt: string
       user: { id: string; fullName: string; email: string }
@@ -774,9 +776,11 @@ class ApiClient {
     sportsgroundId: string
     templateId: string
     name: string
-    coordinates: { lat: number; lng: number }
-    rotation?: number
-    dimensions: { length: number; width: number }
+    latitude: number
+    longitude: number
+    rotationDegrees?: number
+    lengthMeters: number
+    widthMeters: number
     lineColor?: string
   }) {
     return this.request<{
@@ -797,9 +801,11 @@ class ApiClient {
     sportsgroundId: string
     templateId: string
     name: string
-    coordinates: { lat: number; lng: number }
-    rotation: number
-    dimensions: { length: number; width: number }
+    latitude: number
+    longitude: number
+    rotationDegrees: number
+    lengthMeters: number
+    widthMeters: number
     lineColor: string
   }>) {
     return this.request<{
