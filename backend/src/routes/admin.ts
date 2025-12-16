@@ -824,8 +824,14 @@ router.get('/configurations', requireAdmin, async (req: AuthRequest, res: Respon
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 20
     const search = req.query.search as string
+    const sportsgroundId = req.query.sportsgroundId as string
 
     const where: Record<string, unknown> = {}
+
+    // Filter by sportsground if provided
+    if (sportsgroundId) {
+      where.sportsgroundId = sportsgroundId
+    }
 
     if (search) {
       where.OR = [

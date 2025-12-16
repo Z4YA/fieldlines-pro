@@ -423,9 +423,18 @@ export default function AdminSportsgroundsPage() {
                     </div>
                     <div>
                       <p className="text-gray-500">Configurations</p>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                        {sg._count.configurations} configuration{sg._count.configurations !== 1 ? 's' : ''}
-                      </span>
+                      {sg._count.configurations > 0 ? (
+                        <Link
+                          href={`/dashboard/admin/configurations?sportsgroundId=${sg.id}`}
+                          className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
+                        >
+                          {sg._count.configurations} configuration{sg._count.configurations !== 1 ? 's' : ''}
+                        </Link>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">
+                          0 configurations
+                        </span>
+                      )}
                     </div>
                     <div>
                       <p className="text-gray-500">Created</p>
@@ -510,9 +519,18 @@ export default function AdminSportsgroundsPage() {
                       <p className="text-sm text-gray-500">{sg.user.email}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                        {sg._count.configurations} configuration{sg._count.configurations !== 1 ? 's' : ''}
-                      </span>
+                      {sg._count.configurations > 0 ? (
+                        <Link
+                          href={`/dashboard/admin/configurations?sportsgroundId=${sg.id}`}
+                          className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors"
+                        >
+                          {sg._count.configurations} configuration{sg._count.configurations !== 1 ? 's' : ''}
+                        </Link>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-sm font-medium">
+                          0 configurations
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-gray-500">
                       {new Date(sg.createdAt).toLocaleDateString()}

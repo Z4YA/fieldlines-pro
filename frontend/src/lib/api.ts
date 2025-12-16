@@ -719,11 +719,12 @@ class ApiClient {
   }
 
   // Admin - Configurations
-  async getAdminConfigurations(params?: { page?: number; limit?: number; search?: string }) {
+  async getAdminConfigurations(params?: { page?: number; limit?: number; search?: string; sportsgroundId?: string }) {
     const query = new URLSearchParams()
     if (params?.page) query.set('page', params.page.toString())
     if (params?.limit) query.set('limit', params.limit.toString())
     if (params?.search) query.set('search', params.search)
+    if (params?.sportsgroundId) query.set('sportsgroundId', params.sportsgroundId)
     const queryString = query.toString()
     return this.request<{
       configurations: Array<{

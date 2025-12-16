@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 
 interface Configuration {
@@ -37,6 +39,8 @@ type SortField = 'name' | 'sportsground' | 'template' | 'owner' | 'bookings' | '
 type SortDirection = 'asc' | 'desc'
 
 export default function AdminConfigurationsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [configurations, setConfigurations] = useState<Configuration[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -45,6 +49,10 @@ export default function AdminConfigurationsPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  // Sportsground filter from URL
+  const sportsgroundId = searchParams.get('sportsgroundId')
+  const [filterSportsgroundName, setFilterSportsgroundName] = useState<string | null>(null)
 
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false)
@@ -94,10 +102,17 @@ export default function AdminConfigurationsPage() {
     const response = await api.getAdminConfigurations({
       page: pagination.page,
       search: searchQuery || undefined,
+      sportsgroundId: sportsgroundId || undefined,
     })
     if (response.data) {
       setConfigurations(response.data.configurations)
       setPagination(response.data.pagination)
+      // Set filter name from first result if filtering by sportsground
+      if (sportsgroundId && response.data.configurations.length > 0) {
+        setFilterSportsgroundName(response.data.configurations[0].sportsground.name)
+      } else if (!sportsgroundId) {
+        setFilterSportsgroundName(null)
+      }
     }
     setIsLoading(false)
   }
@@ -112,12 +127,16 @@ export default function AdminConfigurationsPage() {
   useEffect(() => {
     fetchConfigurations()
     fetchUsers()
-  }, [pagination.page])
+  }, [pagination.page, sportsgroundId])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setPagination((prev) => ({ ...prev, page: 1 }))
     fetchConfigurations()
+  }
+
+  const clearSportsgroundFilter = () => {
+    router.push('/dashboard/admin/configurations')
   }
 
   const handleSort = (field: SortField) => {
@@ -305,6 +324,29 @@ export default function AdminConfigurationsPage() {
         <p className="text-gray-600">Manage all field configurations on the platform</p>
       </div>
 
+      {/* Sportsground Filter Indicator */}
+      {sportsgroundId && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <span className="text-orange-800">
+              Showing configurations for: <strong>{filterSportsgroundName || 'Loading...'}</strong>
+            </span>
+          </div>
+          <button
+            onClick={clearSportsgroundFilter}
+            className="text-orange-600 hover:text-orange-800 text-sm font-medium flex items-center gap-1"
+          >
+            Clear filter
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Success/Error Messages */}
       {success && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700">
@@ -396,7 +438,12 @@ export default function AdminConfigurationsPage() {
                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Sportsground</p>
-                      <p className="text-gray-900">{config.sportsground.name}</p>
+                      <Link
+                        href={`/dashboard/admin/sportsgrounds?search=${encodeURIComponent(config.sportsground.name)}`}
+                        className="text-orange-600 hover:text-orange-800 hover:underline"
+                      >
+                        {config.sportsground.name}
+                      </Link>
                       <p className="text-gray-600 text-xs">{config.sportsground.address}</p>
                     </div>
                     <div>
@@ -495,7 +542,12 @@ export default function AdminConfigurationsPage() {
                       <p className="font-medium text-gray-900">{config.name}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-gray-900">{config.sportsground.name}</p>
+                      <Link
+                        href={`/dashboard/admin/sportsgrounds?search=${encodeURIComponent(config.sportsground.name)}`}
+                        className="text-orange-600 hover:text-orange-800 hover:underline"
+                      >
+                        {config.sportsground.name}
+                      </Link>
                       <p className="text-sm text-gray-500">{config.sportsground.address}</p>
                     </td>
                     <td className="px-6 py-4">
