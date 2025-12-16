@@ -642,7 +642,7 @@ class ApiClient {
         latitude: number
         longitude: number
         createdAt: string
-        user: { id: string; fullName: string; email: string }
+        user: { id: string; fullName: string; email: string; organization: string | null }
         _count: { configurations: number }
       }>
       pagination: { page: number; limit: number; total: number; pages: number }
@@ -735,7 +735,7 @@ class ApiClient {
         lineColor: string
         rotationDegrees: number
         createdAt: string
-        user: { id: string; fullName: string; email: string }
+        user: { id: string; fullName: string; email: string; organization: string | null }
         sportsground: { id: string; name: string; address: string }
         template: { id: string; name: string; sport: string }
         _count: { bookings: number }
