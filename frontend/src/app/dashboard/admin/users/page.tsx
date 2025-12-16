@@ -10,6 +10,7 @@ interface User {
   fullName: string
   email: string
   phone: string
+  organization?: string
   role: string
   emailVerified: boolean
   suspended: boolean
@@ -21,7 +22,7 @@ interface User {
   }
 }
 
-type SortField = 'fullName' | 'email' | 'role' | 'status' | 'activity' | 'createdAt'
+type SortField = 'fullName' | 'email' | 'organization' | 'role' | 'status' | 'activity' | 'createdAt'
 type SortDirection = 'asc' | 'desc'
 
 export default function AdminUsersPage() {
@@ -211,6 +212,9 @@ export default function AdminUsersPage() {
           break
         case 'email':
           comparison = a.email.localeCompare(b.email)
+          break
+        case 'organization':
+          comparison = (a.organization || '').localeCompare(b.organization || '')
           break
         case 'role':
           comparison = a.role.localeCompare(b.role)
@@ -495,11 +499,15 @@ export default function AdminUsersPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid md:grid-cols-3 gap-4 text-sm">
+                  <div className="grid md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Contact</p>
                       <p className="text-gray-900">{user.email}</p>
                       <p className="text-gray-600 text-xs">{user.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Organization</p>
+                      <p className="text-gray-900">{user.organization || '-'}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Activity</p>
@@ -542,6 +550,15 @@ export default function AdminUsersPage() {
                     <div className="flex items-center gap-1">
                       Contact
                       <SortIcon field="email" />
+                    </div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('organization')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Organization
+                      <SortIcon field="organization" />
                     </div>
                   </th>
                   <th
@@ -595,6 +612,9 @@ export default function AdminUsersPage() {
                     <td className="px-6 py-4">
                       <p className="text-gray-900">{user.email}</p>
                       <p className="text-sm text-gray-500">{user.phone}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-gray-900">{user.organization || '-'}</p>
                     </td>
                     <td className="px-6 py-4">
                       {canEditUserRole(user) ? (
