@@ -178,7 +178,14 @@ export default function AdminSchedulerPage() {
   }
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
-    setDateRange({ start: arg.start, end: arg.end })
+    setDateRange(prev => {
+      // Only update if dates actually changed to prevent infinite loop
+      if (prev.start.getTime() === arg.start.getTime() &&
+          prev.end.getTime() === arg.end.getTime()) {
+        return prev
+      }
+      return { start: arg.start, end: arg.end }
+    })
   }, [])
 
   const handleEventClick = useCallback((info: EventClickArg) => {
