@@ -524,6 +524,29 @@ class ApiClient {
     )
   }
 
+  async updateAdminUser(id: string, data: {
+    fullName?: string
+    email?: string
+    phone?: string
+    organization?: string | null
+    role?: 'user' | 'admin' | 'super_admin'
+  }) {
+    return this.request<{
+      id: string
+      email: string
+      fullName: string
+      phone: string
+      organization: string | null
+      role: string
+      emailVerified: boolean
+      createdAt: string
+      updatedAt: string
+    }>(
+      `/api/admin/users/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) }
+    )
+  }
+
   async suspendUser(id: string, suspended: boolean) {
     return this.request<{ id: string; email: string; fullName: string; suspended: boolean; suspendedAt: string | null }>(
       `/api/admin/users/${id}/suspend`,

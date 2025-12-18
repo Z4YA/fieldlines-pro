@@ -11,6 +11,7 @@ interface UserDetail {
   fullName: string
   email: string
   phone: string
+  organization?: string | null
   role: string
   emailVerified: boolean
   createdAt: string
@@ -40,7 +41,19 @@ export default function AdminUserDetailPage() {
   const [user, setUser] = useState<UserDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [updatingRole, setUpdatingRole] = useState(false)
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    organization: '',
+    role: ''
+  })
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState('')
+  const [updateSuccess, setUpdateSuccess] = useState('')
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -55,14 +68,50 @@ export default function AdminUserDetailPage() {
     fetchUser()
   }, [params.id])
 
-  const handleRoleChange = async (newRole: string) => {
-    if (!user || !isSuperAdmin) return
-    setUpdatingRole(true)
-    const response = await api.updateUserRole(user.id, newRole)
-    if (!response.error) {
-      setUser({ ...user, role: newRole })
+  const openEditModal = () => {
+    if (!user) return
+    setEditForm({
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      organization: user.organization || '',
+      role: user.role
+    })
+    setUpdateError('')
+    setShowEditModal(true)
+  }
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setIsUpdating(true)
+    setUpdateError('')
+
+    const response = await api.updateAdminUser(user.id, {
+      fullName: editForm.fullName,
+      email: editForm.email,
+      phone: editForm.phone,
+      organization: editForm.organization || null,
+      role: editForm.role as 'user' | 'admin' | 'super_admin'
+    })
+
+    if (response.error) {
+      setUpdateError(response.error)
+    } else if (response.data) {
+      setUser({
+        ...user,
+        fullName: response.data.fullName,
+        email: response.data.email,
+        phone: response.data.phone,
+        organization: response.data.organization,
+        role: response.data.role
+      })
+      setShowEditModal(false)
+      setUpdateSuccess('User updated successfully')
+      setTimeout(() => setUpdateSuccess(''), 5000)
     }
-    setUpdatingRole(false)
+    setIsUpdating(false)
   }
 
   const getStatusBadge = (status: string) => {
@@ -87,6 +136,13 @@ export default function AdminUserDetailPage() {
   const formatRole = (role: string) => {
     return role === 'super_admin' ? 'Super Admin' : role.charAt(0).toUpperCase() + role.slice(1)
   }
+
+  // Check if current admin can edit this user
+  const canEdit = user && (
+    isSuperAdmin
+      ? user.role !== 'super_admin' // Super admin can edit anyone except other super admins
+      : user.role === 'user' // Regular admin can only edit regular users
+  )
 
   if (isLoading) {
     return (
@@ -116,8 +172,28 @@ export default function AdminUserDetailPage() {
           </svg>
           Back to Users
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">User Details</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">User Details</h1>
+          {canEdit && (
+            <button
+              onClick={openEditModal}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit User
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Success Message */}
+      {updateSuccess && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700">
+          {updateSuccess}
+        </div>
+      )}
 
       {/* User Info Card */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -132,27 +208,15 @@ export default function AdminUserDetailPage() {
               <h2 className="text-xl font-semibold text-gray-900">{user.fullName}</h2>
               <p className="text-gray-500">{user.email}</p>
               <p className="text-gray-500">{user.phone}</p>
+              {user.organization && (
+                <p className="text-gray-500">{user.organization}</p>
+              )}
             </div>
           </div>
           <div className="text-right">
-            {isSuperAdmin && user.role !== 'super_admin' ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Role:</span>
-                <select
-                  value={user.role}
-                  onChange={(e) => handleRoleChange(e.target.value)}
-                  disabled={updatingRole}
-                  className={`px-3 py-1.5 rounded font-medium ${getRoleBadge(user.role)} border-0 cursor-pointer disabled:opacity-50`}
-                >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            ) : (
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleBadge(user.role)}`}>
-                {formatRole(user.role)}
-              </span>
-            )}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleBadge(user.role)}`}>
+              {formatRole(user.role)}
+            </span>
             <div className="mt-2">
               {user.emailVerified ? (
                 <span className="inline-flex items-center text-green-600 text-sm">
@@ -242,6 +306,113 @@ export default function AdminUserDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit User</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {updateError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {updateError}
+                </div>
+              )}
+
+              <form onSubmit={handleUpdateUser} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editForm.fullName}
+                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    required
+                    minLength={2}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    required
+                    minLength={10}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+                  <input
+                    type="text"
+                    value={editForm.organization}
+                    onChange={(e) => setEditForm({ ...editForm, organization: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    placeholder="Optional"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                  >
+                    <option value="user">User</option>
+                    {isSuperAdmin && <option value="admin">Admin</option>}
+                  </select>
+                  {!isSuperAdmin && (
+                    <p className="text-xs text-gray-500 mt-1">Only super admins can promote users to admin</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                  >
+                    {isUpdating ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
