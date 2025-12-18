@@ -282,6 +282,14 @@ export default function AdminSchedulerPage() {
     setIsCreating(false)
   }
 
+  // Filter bookings by organization (client-side)
+  const filteredBookings = useMemo(() => {
+    if (!organizationFilter) return bookings
+    // Look up user's organization from users list
+    const orgUserIds = new Set(users.filter(u => u.organization === organizationFilter).map(u => u.id))
+    return bookings.filter(b => orgUserIds.has(b.user.id))
+  }, [bookings, organizationFilter, users])
+
   const calendarEvents = useMemo(() => {
     // Map text-based time preferences to actual times
     const timeMap: Record<string, string> = {
@@ -291,7 +299,7 @@ export default function AdminSchedulerPage() {
       'evening': '18:00'
     }
 
-    return bookings.map(booking => {
+    return filteredBookings.map(booking => {
       const dateStr = booking.preferredDate?.split('T')[0]
 
       // Check if preferredTime is a text value or actual time
@@ -320,7 +328,7 @@ export default function AdminSchedulerPage() {
         extendedProps: { booking }
       }
     })
-  }, [bookings])
+  }, [filteredBookings])
 
   // Filtered configurations based on sportsground
   const filteredConfigurations = useMemo(() => {
@@ -337,9 +345,9 @@ export default function AdminSchedulerPage() {
   // Mobile day view bookings
   const mobileDayBookings = useMemo(() => {
     const dayStr = mobileDate.toISOString().split('T')[0]
-    return bookings.filter(b => b.preferredDate.split('T')[0] === dayStr)
+    return filteredBookings.filter(b => b.preferredDate.split('T')[0] === dayStr)
       .sort((a, b) => a.preferredTime.localeCompare(b.preferredTime))
-  }, [bookings, mobileDate])
+  }, [filteredBookings, mobileDate])
 
   const handleViewChange = (view: 'week' | 'month') => {
     setCurrentView(view)
