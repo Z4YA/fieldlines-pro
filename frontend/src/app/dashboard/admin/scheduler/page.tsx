@@ -281,26 +281,35 @@ export default function AdminSchedulerPage() {
   }
 
   const calendarEvents = useMemo(() => {
-    console.log('Transforming bookings to events:', bookings)
+    // Map text-based time preferences to actual times
+    const timeMap: Record<string, string> = {
+      'flexible': '09:00',
+      'morning': '09:00',
+      'afternoon': '14:00',
+      'evening': '18:00'
+    }
+
     return bookings.map(booking => {
-      console.log('Processing booking:', {
-        id: booking.id,
-        ref: booking.referenceNumber,
-        preferredDate: booking.preferredDate,
-        preferredTime: booking.preferredTime,
-        status: booking.status,
-        config: booking.configuration
-      })
       const dateStr = booking.preferredDate?.split('T')[0]
-      const [hours, minutes] = (booking.preferredTime || '09:00').split(':')
+
+      // Check if preferredTime is a text value or actual time
+      let timeStr = booking.preferredTime || '09:00'
+      if (timeMap[timeStr.toLowerCase()]) {
+        timeStr = timeMap[timeStr.toLowerCase()]
+      }
+
+      const [hours, minutes] = timeStr.split(':')
       const startDate = new Date(`${dateStr}T${hours}:${minutes}:00`)
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // 1 hour duration
 
-      console.log('Event dates:', { dateStr, startDate, endDate, isValidStart: !isNaN(startDate.getTime()) })
+      // Include the original time preference in the title if it's not a specific time
+      const timeLabel = booking.preferredTime && !booking.preferredTime.includes(':')
+        ? ` (${booking.preferredTime})`
+        : ''
 
       return {
         id: booking.id,
-        title: `${booking.referenceNumber} - ${booking.configuration?.name || 'Unknown'}`,
+        title: `${booking.referenceNumber} - ${booking.configuration?.name || 'Unknown'}${timeLabel}`,
         start: startDate,
         end: endDate,
         backgroundColor: statusColors[booking.status]?.bg || '#ccc',
