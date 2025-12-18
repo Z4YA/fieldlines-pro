@@ -627,6 +627,99 @@ class ApiClient {
     })
   }
 
+  // Admin - Calendar bookings
+  async getAdminCalendarBookings(params: {
+    startDate: string
+    endDate: string
+    status?: string
+    sportsgroundId?: string
+    configurationId?: string
+    userId?: string
+  }) {
+    const query = new URLSearchParams()
+    query.set('startDate', params.startDate)
+    query.set('endDate', params.endDate)
+    if (params.status) query.set('status', params.status)
+    if (params.sportsgroundId) query.set('sportsgroundId', params.sportsgroundId)
+    if (params.configurationId) query.set('configurationId', params.configurationId)
+    if (params.userId) query.set('userId', params.userId)
+
+    return this.request<{
+      bookings: Array<{
+        id: string
+        referenceNumber: string
+        preferredDate: string
+        preferredTime: string
+        status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
+        notes: string | null
+        user: { id: string; fullName: string; email: string }
+        configuration: {
+          id: string
+          name: string
+          sportsground: { id: string; name: string }
+          template: { id: string; name: string; sport: string }
+        }
+      }>
+    }>(`/api/admin/bookings/calendar?${query.toString()}`)
+  }
+
+  // Admin - Create booking
+  async createAdminBooking(data: {
+    userId: string
+    configurationId: string
+    preferredDate: string
+    preferredTime: string
+    alternativeDate?: string
+    notes?: string
+    contactPreference: 'phone' | 'email'
+  }) {
+    return this.request<{
+      id: string
+      referenceNumber: string
+      preferredDate: string
+      preferredTime: string
+      status: string
+      user: { id: string; fullName: string; email: string }
+      configuration: {
+        id: string
+        name: string
+        sportsground: { id: string; name: string }
+        template: { id: string; name: string; sport: string }
+      }
+    }>('/api/admin/bookings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Admin - Update booking (full update)
+  async updateAdminBooking(id: string, data: {
+    preferredDate?: string
+    preferredTime?: string
+    alternativeDate?: string | null
+    status?: string
+    notes?: string
+    configurationId?: string
+  }) {
+    return this.request<{
+      id: string
+      referenceNumber: string
+      preferredDate: string
+      preferredTime: string
+      status: string
+      user: { id: string; fullName: string; email: string }
+      configuration: {
+        id: string
+        name: string
+        sportsground: { id: string; name: string }
+        template: { id: string; name: string; sport: string }
+      }
+    }>(`/api/admin/bookings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
   // Admin - Sportsgrounds
   async getAdminSportsgrounds(params?: { page?: number; limit?: number; search?: string }) {
     const query = new URLSearchParams()

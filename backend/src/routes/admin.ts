@@ -536,6 +536,77 @@ router.get('/bookings', requireAdmin, async (req: AuthRequest, res: Response) =>
   }
 })
 
+// GET /api/admin/bookings/calendar - Get bookings for calendar view (date range)
+router.get('/bookings/calendar', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const startDate = req.query.startDate as string
+    const endDate = req.query.endDate as string
+    const status = req.query.status as string
+    const sportsgroundId = req.query.sportsgroundId as string
+    const configurationId = req.query.configurationId as string
+    const userId = req.query.userId as string
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+
+    const where: Record<string, unknown> = {
+      preferredDate: {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
+      }
+    }
+
+    // Status filter (comma-separated for multiple)
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim())
+      where.status = { in: statuses }
+    }
+
+    // Sportsground filter
+    if (sportsgroundId) {
+      where.configuration = {
+        ...((where.configuration as object) || {}),
+        sportsgroundId
+      }
+    }
+
+    // Configuration filter
+    if (configurationId) {
+      where.configurationId = configurationId
+    }
+
+    // User filter
+    if (userId) {
+      where.userId = userId
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        user: {
+          select: { id: true, fullName: true, email: true }
+        },
+        configuration: {
+          include: {
+            sportsground: { select: { id: true, name: true } },
+            template: { select: { id: true, name: true, sport: true } }
+          }
+        }
+      },
+      orderBy: [
+        { preferredDate: 'asc' },
+        { preferredTime: 'asc' }
+      ]
+    })
+
+    res.json({ bookings })
+  } catch (error) {
+    console.error('Get admin calendar bookings error:', error)
+    res.status(500).json({ error: 'Failed to get calendar bookings' })
+  }
+})
+
 // GET /api/admin/bookings/:id - Get booking detail
 router.get('/bookings/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
@@ -603,6 +674,154 @@ router.put('/bookings/:id/status', requireAdmin, async (req: AuthRequest, res: R
   } catch (error) {
     console.error('Update booking status error:', error)
     res.status(500).json({ error: 'Failed to update booking status' })
+  }
+})
+
+// POST /api/admin/bookings - Create booking on behalf of a user
+const adminCreateBookingSchema = z.object({
+  userId: z.string().uuid(),
+  configurationId: z.string().uuid(),
+  preferredDate: z.string(),
+  preferredTime: z.string(),
+  alternativeDate: z.string().optional(),
+  notes: z.string().max(500).optional(),
+  contactPreference: z.enum(['phone', 'email'])
+})
+
+router.post('/bookings', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = adminCreateBookingSchema.safeParse(req.body)
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors[0].message })
+    }
+
+    const data = validation.data
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({ where: { id: data.userId } })
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Verify configuration exists
+    const configuration = await prisma.fieldConfiguration.findUnique({
+      where: { id: data.configurationId },
+      include: { sportsground: true }
+    })
+    if (!configuration) {
+      return res.status(404).json({ error: 'Configuration not found' })
+    }
+
+    // Generate unique reference number
+    const year = new Date().getFullYear()
+    let referenceNumber: string
+    let attempts = 0
+    do {
+      const randomNum = Math.floor(1000 + Math.random() * 9000)
+      referenceNumber = `BK-${year}-${randomNum}`
+      const existing = await prisma.booking.findUnique({ where: { referenceNumber } })
+      if (!existing) break
+      attempts++
+    } while (attempts < 10)
+
+    if (attempts >= 10) {
+      return res.status(500).json({ error: 'Failed to generate unique reference number' })
+    }
+
+    const booking = await prisma.booking.create({
+      data: {
+        userId: data.userId,
+        configurationId: data.configurationId,
+        referenceNumber,
+        preferredDate: new Date(data.preferredDate),
+        preferredTime: data.preferredTime,
+        alternativeDate: data.alternativeDate ? new Date(data.alternativeDate) : null,
+        notes: data.notes,
+        contactPreference: data.contactPreference,
+        status: 'pending'
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        configuration: {
+          include: {
+            sportsground: { select: { id: true, name: true } },
+            template: { select: { id: true, name: true, sport: true } }
+          }
+        }
+      }
+    })
+
+    res.status(201).json(booking)
+  } catch (error) {
+    console.error('Admin create booking error:', error)
+    res.status(500).json({ error: 'Failed to create booking' })
+  }
+})
+
+// PUT /api/admin/bookings/:id - Full booking update
+const adminUpdateBookingSchema = z.object({
+  preferredDate: z.string().optional(),
+  preferredTime: z.string().optional(),
+  alternativeDate: z.string().nullable().optional(),
+  status: z.enum(['pending', 'confirmed', 'completed', 'cancelled']).optional(),
+  notes: z.string().max(500).optional(),
+  configurationId: z.string().uuid().optional()
+})
+
+router.put('/bookings/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const validation = adminUpdateBookingSchema.safeParse(req.body)
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.error.errors[0].message })
+    }
+
+    const data = validation.data
+
+    // Verify booking exists
+    const existing = await prisma.booking.findUnique({ where: { id } })
+    if (!existing) {
+      return res.status(404).json({ error: 'Booking not found' })
+    }
+
+    // If changing configuration, verify it exists
+    if (data.configurationId) {
+      const configuration = await prisma.fieldConfiguration.findUnique({
+        where: { id: data.configurationId }
+      })
+      if (!configuration) {
+        return res.status(404).json({ error: 'Configuration not found' })
+      }
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (data.preferredDate) updateData.preferredDate = new Date(data.preferredDate)
+    if (data.preferredTime) updateData.preferredTime = data.preferredTime
+    if (data.alternativeDate !== undefined) {
+      updateData.alternativeDate = data.alternativeDate ? new Date(data.alternativeDate) : null
+    }
+    if (data.status) updateData.status = data.status
+    if (data.notes !== undefined) updateData.notes = data.notes
+    if (data.configurationId) updateData.configurationId = data.configurationId
+
+    const booking = await prisma.booking.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        configuration: {
+          include: {
+            sportsground: { select: { id: true, name: true } },
+            template: { select: { id: true, name: true, sport: true } }
+          }
+        }
+      }
+    })
+
+    res.json(booking)
+  } catch (error) {
+    console.error('Admin update booking error:', error)
+    res.status(500).json({ error: 'Failed to update booking' })
   }
 })
 
