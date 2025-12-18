@@ -41,6 +41,7 @@ interface User {
   id: string
   fullName: string
   email: string
+  organization: string | null
 }
 
 const statusColors = {
@@ -65,6 +66,7 @@ export default function AdminSchedulerPage() {
   const [sportsgroundFilter, setSportsgroundFilter] = useState('')
   const [configurationFilter, setConfigurationFilter] = useState('')
   const [userFilter, setUserFilter] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
 
   // Filter options
   const [sportsgrounds, setSportsgrounds] = useState<Sportsground[]>([])
@@ -326,6 +328,12 @@ export default function AdminSchedulerPage() {
     return configurations.filter(c => c.sportsground.id === sportsgroundFilter)
   }, [configurations, sportsgroundFilter])
 
+  // Filtered users based on organization
+  const filteredUsers = useMemo(() => {
+    if (!organizationFilter) return users
+    return users.filter(u => u.organization === organizationFilter)
+  }, [users, organizationFilter])
+
   // Mobile day view bookings
   const mobileDayBookings = useMemo(() => {
     const dayStr = mobileDate.toISOString().split('T')[0]
@@ -530,7 +538,7 @@ export default function AdminSchedulerPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* View Toggle */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">View</label>
@@ -600,17 +608,35 @@ export default function AdminSchedulerPage() {
             </select>
           </div>
 
-          {/* User Filter */}
+          {/* Requester Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">User</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Requester</label>
             <select
               value={userFilter}
               onChange={(e) => setUserFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
             >
-              <option value="">All Users</option>
-              {users.map(u => (
+              <option value="">All Requesters</option>
+              {filteredUsers.map(u => (
                 <option key={u.id} value={u.id}>{u.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Organization Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+            <select
+              value={organizationFilter}
+              onChange={(e) => {
+                setOrganizationFilter(e.target.value)
+                setUserFilter('') // Clear requester when organization changes
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:outline-none"
+            >
+              <option value="">All Organizations</option>
+              {Array.from(new Set(users.map(u => u.organization).filter((o): o is string => Boolean(o)))).sort().map(org => (
+                <option key={org} value={org}>{org}</option>
               ))}
             </select>
           </div>
@@ -738,11 +764,12 @@ function BookingModal({
 
           {/* Booking Info */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-2">
-            <p><span className="text-gray-500">Customer:</span> <span className="font-medium">{booking.user.fullName}</span></p>
+            <p><span className="text-gray-500">Requester:</span> <span className="font-medium">{booking.user.fullName}</span></p>
             <p><span className="text-gray-500">Email:</span> {booking.user.email}</p>
             <p><span className="text-gray-500">Configuration:</span> {booking.configuration.name}</p>
             <p><span className="text-gray-500">Sportsground:</span> {booking.configuration.sportsground.name}</p>
             <p><span className="text-gray-500">Sport:</span> {booking.configuration.template.sport}</p>
+            <p><span className="text-gray-500">Preferred Time:</span> <span className="font-medium capitalize">{booking.preferredTime}</span></p>
           </div>
 
           {error && (

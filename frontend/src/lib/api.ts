@@ -926,6 +926,7 @@ class ApiClient {
         id: string
         fullName: string
         email: string
+        organization: string | null
       }>
       pagination: { page: number; limit: number; total: number; pages: number }
     }>('/api/admin/users?limit=1000')
