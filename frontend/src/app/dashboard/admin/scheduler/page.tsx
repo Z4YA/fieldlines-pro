@@ -163,6 +163,10 @@ export default function AdminSchedulerPage() {
 
   const fetchBookings = async () => {
     setIsLoading(true)
+    console.log('Fetching bookings for range:', {
+      start: dateRange.start.toISOString(),
+      end: dateRange.end.toISOString()
+    })
     const response = await api.getAdminCalendarBookings({
       startDate: dateRange.start.toISOString(),
       endDate: dateRange.end.toISOString(),
@@ -172,7 +176,9 @@ export default function AdminSchedulerPage() {
       userId: userFilter || undefined
     })
 
+    console.log('Calendar bookings response:', response)
     if (response.data) {
+      console.log('Bookings received:', response.data.bookings.length, response.data.bookings)
       setBookings(response.data.bookings)
     }
     setIsLoading(false)
