@@ -281,20 +281,31 @@ export default function AdminSchedulerPage() {
   }
 
   const calendarEvents = useMemo(() => {
+    console.log('Transforming bookings to events:', bookings)
     return bookings.map(booking => {
-      const dateStr = booking.preferredDate.split('T')[0]
-      const [hours, minutes] = booking.preferredTime.split(':')
+      console.log('Processing booking:', {
+        id: booking.id,
+        ref: booking.referenceNumber,
+        preferredDate: booking.preferredDate,
+        preferredTime: booking.preferredTime,
+        status: booking.status,
+        config: booking.configuration
+      })
+      const dateStr = booking.preferredDate?.split('T')[0]
+      const [hours, minutes] = (booking.preferredTime || '09:00').split(':')
       const startDate = new Date(`${dateStr}T${hours}:${minutes}:00`)
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // 1 hour duration
 
+      console.log('Event dates:', { dateStr, startDate, endDate, isValidStart: !isNaN(startDate.getTime()) })
+
       return {
         id: booking.id,
-        title: `${booking.referenceNumber} - ${booking.configuration.name}`,
+        title: `${booking.referenceNumber} - ${booking.configuration?.name || 'Unknown'}`,
         start: startDate,
         end: endDate,
-        backgroundColor: statusColors[booking.status].bg,
-        borderColor: statusColors[booking.status].border,
-        textColor: statusColors[booking.status].text,
+        backgroundColor: statusColors[booking.status]?.bg || '#ccc',
+        borderColor: statusColors[booking.status]?.border || '#999',
+        textColor: statusColors[booking.status]?.text || '#333',
         extendedProps: { booking }
       }
     })
