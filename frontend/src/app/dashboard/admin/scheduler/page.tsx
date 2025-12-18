@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -51,6 +51,7 @@ const statusColors = {
 }
 
 export default function AdminSchedulerPage() {
+  const calendarRef = useRef<FullCalendar>(null)
   const [bookings, setBookings] = useState<CalendarBooking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentView, setCurrentView] = useState<'week' | 'month'>('week')
@@ -308,11 +309,9 @@ export default function AdminSchedulerPage() {
 
   const handleViewChange = (view: 'week' | 'month') => {
     setCurrentView(view)
-    const now = new Date()
-    if (view === 'week') {
-      setDateRange({ start: getWeekStart(now), end: getWeekEnd(now) })
-    } else {
-      setDateRange({ start: getMonthStart(now), end: getMonthEnd(now) })
+    const calendarApi = calendarRef.current?.getApi()
+    if (calendarApi) {
+      calendarApi.changeView(view === 'week' ? 'timeGridWeek' : 'dayGridMonth')
     }
   }
 
@@ -613,33 +612,33 @@ export default function AdminSchedulerPage() {
       </div>
 
       {/* Calendar */}
-      <div className="bg-white rounded-lg shadow p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-96">
+      <div className="bg-white rounded-lg shadow p-4 relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
           </div>
-        ) : (
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={currentView === 'week' ? 'timeGridWeek' : 'dayGridMonth'}
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: ''
-            }}
-            events={calendarEvents}
-            eventClick={handleEventClick}
-            dateClick={handleDateClick}
-            datesSet={handleDatesSet}
-            height="auto"
-            slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
-            allDaySlot={false}
-            nowIndicator={true}
-            eventDisplay="block"
-            dayMaxEvents={3}
-          />
         )}
+        <FullCalendar
+          ref={calendarRef}
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView={currentView === 'week' ? 'timeGridWeek' : 'dayGridMonth'}
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: ''
+          }}
+          events={calendarEvents}
+          eventClick={handleEventClick}
+          dateClick={handleDateClick}
+          datesSet={handleDatesSet}
+          height="auto"
+          slotMinTime="06:00:00"
+          slotMaxTime="22:00:00"
+          allDaySlot={false}
+          nowIndicator={true}
+          eventDisplay="block"
+          dayMaxEvents={3}
+        />
       </div>
 
       {/* Booking Modal */}
